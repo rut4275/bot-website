@@ -149,14 +149,14 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.messages = this.messages.filter(msg => msg.id !== loadingMessage.id);
         
         // Update thread ID if provided
-        if (response["thread_Id_cmd_gen"]) {
-          this.threadId = response["thread_Id_cmd_gen"];
+        if (response.thread_Id_cmd_gen) {
+          this.threadId = response.thread_Id_cmd_gen;
         }
         
         // Add bot response
         const botMessage: ChatMessage = {
           id: Date.now().toString(),
-          text: response["תשובה"] || 'תשובה התקבלה',
+          text: response.answer || 'תשובה התקבלה',
           isUser: false,
           timestamp: new Date(),
           status: 'sent'

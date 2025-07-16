@@ -26,7 +26,7 @@ export interface AdminConfig {
 }
 
 export interface WebhookResponse {
-  "תשובה": string;
+  "answer": string;
   "thread_Id_cmd_gen": string;
-  "סיום שיחה": string;
+  "end": string;
 }
