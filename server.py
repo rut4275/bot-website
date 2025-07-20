@@ -16,7 +16,7 @@ CORS(app)
 # Default settings
 DEFAULT_SETTINGS = {
     "webhookUrl": "https://api.example.com/webhook",
-    "openaiApiKey": os.environ.get("openaiApiKey"),
+    "openaiApiKey": str(os.environ.get("openaiApiKey")),
     "products": ["מוצר 1", "מוצר 2", "מוצר 3"],
     "primaryColor": "#2563eb",
     "secondaryColor": "#6b7280",
