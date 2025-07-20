@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError, timeout, catchError } from 'rxjs';
-import { WebhookResponse } from '../models/chat.models';
+import { WebhookResponse, LeadData } from '../models/chat.models';
 
 @Injectable({
   providedIn: 'root'
@@ -9,18 +9,36 @@ import { WebhookResponse } from '../models/chat.models';
 export class WebhookService {
   constructor(private http: HttpClient) {}
 
-  sendMessage(webhookUrl: string, message: string, threadId: string = ''): Observable<WebhookResponse> {
+  sendToOpenAI(apiKey: string, message: string): Observable<any> {
     const payload = {
-      user_message: message,
-      thread_id: threadId
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "user",
+          content: message
+        }
+      ],
+      max_tokens: 500
     };
 
-    return this.http.post<WebhookResponse>(webhookUrl, payload, {
+    return this.http.post('https://api.openai.com/v1/chat/completions', payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      }
+    }).pipe(
+      timeout(60000), // 60 seconds timeout
+      catchError(this.handleError)
+    );
+  }
+
+  sendLeadData(webhookUrl: string, leadData: LeadData): Observable<any> {
+    return this.http.post(webhookUrl, leadData, {
       headers: {
         'Content-Type': 'application/json'
       }
     }).pipe(
-      timeout(60000), // 60 seconds timeout
+      timeout(30000),
       catchError(this.handleError)
     );
   }

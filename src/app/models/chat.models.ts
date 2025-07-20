@@ -8,6 +8,8 @@ export interface ChatMessage {
 
 export interface ChatSettings {
   webhookUrl: string;
+  openaiApiKey: string;
+  products: string[];
   primaryColor: string;
   secondaryColor: string;
   textColor: string;
@@ -21,12 +23,32 @@ export interface ChatSettings {
   userPlaceholder: string;
 }
 
+export interface LeadData {
+  name: string;
+  phone: string;
+  product: string;
+  questions: Array<{
+    question: string;
+    answer: string;
+    timestamp: Date;
+  }>;
+}
+
+export type ChatStep = 
+  | 'collect-name'
+  | 'collect-phone' 
+  | 'collect-product'
+  | 'ask-question'
+  | 'answer-question'
+  | 'ask-continue'
+  | 'completed';
+
 export interface AdminConfig {
   password: string;
 }
 
 export interface WebhookResponse {
-  "answer": string;
+  "תשובה": string;
   "thread_Id_cmd_gen": string;
-  "end": string;
+  "סיום שיחה": string;
 }

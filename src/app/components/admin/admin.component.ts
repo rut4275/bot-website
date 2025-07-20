@@ -129,6 +129,7 @@ export class AdminComponent implements OnInit {
   isAuthenticated = false;
   password = '';
   settings: ChatSettings = {} as ChatSettings;
+  productsText: string = '';
   
   private readonly ADMIN_PASSWORD = 'admin123';
 
@@ -136,6 +137,7 @@ export class AdminComponent implements OnInit {
 
   ngOnInit(): void {
     this.settings = { ...this.settingsService.getSettings() };
+    this.productsText = this.settings.products.join('\n');
   }
 
   openAdmin(): void {
@@ -166,6 +168,7 @@ export class AdminComponent implements OnInit {
     if (confirm('האם אתה בטוח שברצונך לאפס את ההגדרות?')) {
       this.settingsService.resetSettings();
       this.settings = { ...this.settingsService.getSettings() };
+      this.productsText = this.settings.products.join('\n');
       alert('הגדרות אופסו');
     }
   }

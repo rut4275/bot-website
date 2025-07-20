@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ChatMessage, ChatSettings } from '../../models/chat.models';
 import { SettingsService } from '../../services/settings.service';
-import { WebhookService } from '../../services/webhook.service';
+import { ApiService } from '../../services/api.service';
 
 @Component({
   selector: 'app-chat',
@@ -74,14 +74,25 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   isLoading = false;
   private threadId: string = '';
   conversationEnded = false;
+  currentStep: string = '';
+  private conversationId: string = '';
+  leadData: any = {
+    name: '',
+    phone: '',
+    product: '',
+    questions: []
+  };
   
   private settingsSubscription?: Subscription;
   private shouldScrollToBottom = false;
 
   constructor(
     private settingsService: SettingsService,
-    private webhookService: WebhookService
-  ) {}
+    private apiService: ApiService
+  ) {
+    // Generate unique conversation ID
+    this.conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
 
   ngOnInit(): void {
     this.settingsSubscription = this.settingsService.settings$.subscribe(
@@ -113,8 +124,31 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     root.style.setProperty('--font-size', this.settings.fontSize);
   }
 
+  isFormStep(): boolean {
+    return ['collect-name', 'collect-phone', 'collect-product'].includes(this.currentStep);
+  }
+
+  handleNameSubmit(): void {
+    if (!this.leadData.name.trim()) return;
+    this.currentStep = 'collect-phone';
+    this.shouldScrollToBottom = true;
+  }
+
+  handlePhoneSubmit(): void {
+    if (!this.leadData.phone.trim()) return;
+    this.currentStep = 'collect-product';
+    this.shouldScrollToBottom = true;
+  }
+
+  handleProductSubmit(): void {
+    if (!this.leadData.product) return;
+    this.currentStep = 'ask-question';
+    this.addBotMessage('מה תרצה לדעת?');
+    this.shouldScrollToBottom = true;
+  }
+
   sendMessage(): void {
-    if (!this.currentMessage.trim() || this.isLoading) return;
+    if (!this.currentMessage.trim() || this.isLoading || this.isFormStep()) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -126,6 +160,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     this.messages.push(userMessage);
     this.shouldScrollToBottom = true;
+
+    if (this.currentStep === 'ask-continue') {
+      this.handleContinueResponse(this.currentMessage);
+      return;
+    }
 
     const messageToSend = this.currentMessage;
     this.currentMessage = '';
@@ -142,45 +181,98 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.messages.push(loadingMessage);
     this.shouldScrollToBottom = true;
 
-    this.webhookService.sendMessage(this.settings.webhookUrl, messageToSend, this.threadId).subscribe({
+    // Send to OpenAI
+    this.apiService.sendMessage(messageToSend, this.conversationId).subscribe({
       next: (response) => {
         this.isLoading = false;
         // Remove loading message
         this.messages = this.messages.filter(msg => msg.id !== loadingMessage.id);
         
-        // Update thread ID if provided
-        if (response.thread_Id_cmd_gen) {
-          this.threadId = response.thread_Id_cmd_gen;
-        }
+        const answer = response.response || 'מצטער, לא הצלחתי לקבל תשובה';
         
-        // Add bot response
-        const botMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: response.answer || 'תשובה התקבלה',
-          isUser: false,
-          timestamp: new Date(),
-          status: 'sent'
-        };
-        this.messages.push(botMessage);
-        this.shouldScrollToBottom = true;
+        // Save question and answer
+        this.leadData.questions.push({
+          question: messageToSend,
+          answer: answer,
+          timestamp: new Date()
+        });
+        
+        this.addBotMessage(answer);
+        
+        // Ask if user has more questions
+        setTimeout(() => {
+          this.addBotMessage('יש לך עוד שאלה או זה הכל?');
+          this.currentStep = 'ask-continue';
+        }, 1000);
       },
       error: (error) => {
         this.isLoading = false;
         // Remove loading message
         this.messages = this.messages.filter(msg => msg.id !== loadingMessage.id);
-        
-        // Add error message
-        const errorMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: error.message,
-          isUser: false,
-          timestamp: new Date(),
-          status: 'error'
-        };
-        this.messages.push(errorMessage);
-        this.shouldScrollToBottom = true;
+        this.addBotMessage(error.message);
       }
     });
+  }
+
+  handleContinueResponse(response: string): void {
+    const lowerResponse = response.toLowerCase();
+    
+    if (lowerResponse.includes('כן') || lowerResponse.includes('עוד') || lowerResponse.includes('שאלה')) {
+      this.addBotMessage('איך עוד אני יכול לעזור לך?');
+      this.currentStep = 'ask-question';
+    } else {
+      // User is done, send lead data
+      this.sendLeadData();
+    }
+  }
+
+  sendLeadData(): void {
+    this.isLoading = true;
+    
+    const leadDataWithConversation = {
+      ...this.leadData,
+      conversationId: this.conversationId
+    };
+    
+    this.apiService.submitLead(leadDataWithConversation).subscribe({
+      next: () => {
+        this.isLoading = false;
+        this.addBotMessage('תודה שפנית אלינו! נחזור אליך בהקדם.');
+        this.conversationEnded = true;
+        this.currentStep = 'completed';
+      },
+      error: (error) => {
+        this.isLoading = false;
+        this.addBotMessage('תודה שפנית אלינו! נחזור אליך בהקדם.');
+        this.conversationEnded = true;
+        this.currentStep = 'completed';
+      }
+    });
+  }
+
+  addBotMessage(text: string): void {
+    const botMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text: text,
+      isUser: false,
+      timestamp: new Date(),
+      status: 'sent'
+    };
+    this.messages.push(botMessage);
+    this.shouldScrollToBottom = true;
+  }
+
+  resetChat(): void {
+    this.messages = [];
+    this.currentStep = 'collect-name';
+    this.conversationEnded = false;
+    this.conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    this.leadData = {
+      name: '',
+      phone: '',
+      product: '',
+      questions: []
+    };
   }
 
   formatTime(timestamp: Date): string {
