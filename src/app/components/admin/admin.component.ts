@@ -136,8 +136,12 @@ export class AdminComponent implements OnInit {
   constructor(private settingsService: SettingsService) {}
 
   ngOnInit(): void {
-    this.settings = { ...this.settingsService.getSettings() };
-    this.productsText = this.settings.products.join('\n');
+    this.settingsService.settings$.subscribe(settings => {
+      if (settings && Object.keys(settings).length > 0) {
+        this.settings = { ...settings };
+        this.productsText = this.settings.products ? this.settings.products.join('\n') : '';
+      }
+    });
   }
 
   openAdmin(): void {
@@ -167,8 +171,12 @@ export class AdminComponent implements OnInit {
   resetSettings(): void {
     if (confirm('האם אתה בטוח שברצונך לאפס את ההגדרות?')) {
       this.settingsService.resetSettings();
-      this.settings = { ...this.settingsService.getSettings() };
-      this.productsText = this.settings.products.join('\n');
+      this.settingsService.settings$.subscribe(settings => {
+        if (settings && Object.keys(settings).length > 0) {
+          this.settings = { ...settings };
+          this.productsText = this.settings.products ? this.settings.products.join('\n') : '';
+        }
+      });
       alert('הגדרות אופסו');
     }
   }
