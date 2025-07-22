@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked }
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { ChatMessage, ChatSettings } from '../../models/chat.models';
+import { ChatMessage, ChatSettings, ChatStep } from '../../models/chat.models';
 import { SettingsService } from '../../services/settings.service';
 import { ApiService } from '../../services/api.service';
 
@@ -23,6 +23,48 @@ import { ApiService } from '../../services/api.service';
       <div class="chat-messages" #messagesContainer>
         <div class="welcome-message" [style.color]="settings.secondaryColor">
           {{ settings.welcomeMessage }}
+        </div>
+        
+        <!-- Lead Form -->
+        <div *ngIf="isFormStep()" class="lead-form">
+          <!-- Name Collection -->
+          <div *ngIf="currentStep === 'collect-name'" class="form-step">
+            <p>{{ settings.nameLabel }}</p>
+            <input type="text" 
+                   [(ngModel)]="leadData.name" 
+                   (keyup.enter)="handleNameSubmit()"
+                   placeholder="הכנס את שמך"
+                   class="lead-input">
+            <button (click)="handleNameSubmit()" 
+                    [disabled]="!leadData.name.trim()"
+                    class="lead-button">המשך</button>
+          </div>
+          
+          <!-- Phone Collection -->
+          <div *ngIf="currentStep === 'collect-phone'" class="form-step">
+            <p>{{ settings.phoneLabel }}</p>
+            <input type="tel" 
+                   [(ngModel)]="leadData.phone" 
+                   (keyup.enter)="handlePhoneSubmit()"
+                   placeholder="הכנס מספר טלפון"
+                   class="lead-input">
+            <button (click)="handlePhoneSubmit()" 
+                    [disabled]="!leadData.phone.trim()"
+                    class="lead-button">המשך</button>
+          </div>
+          
+          <!-- Product Collection -->
+          <div *ngIf="currentStep === 'collect-product'" class="form-step">
+            <p>{{ settings.productLabel }}</p>
+            <select [(ngModel)]="leadData.product" 
+                    (change)="handleProductSubmit()"
+                    class="lead-select">
+              <option value="">בחר מוצר</option>
+              <option *ngFor="let product of settings.products" [value]="product">
+                {{ product }}
+              </option>
+            </select>
+          </div>
         </div>
         
         <div *ngFor="let message of messages" class="message-wrapper">
@@ -49,12 +91,12 @@ import { ApiService } from '../../services/api.service';
                [(ngModel)]="currentMessage" 
                (keyup.enter)="sendMessage()"
                [placeholder]="settings.userPlaceholder"
-               [disabled]="isLoading"
+               [disabled]="isLoading || isFormStep() || conversationEnded"
                [style.font-family]="settings.fontFamily"
                [style.font-size]="settings.fontSize"
                class="message-input">
         <button (click)="sendMessage()" 
-                [disabled]="isLoading || !currentMessage.trim() || conversationEnded"
+                [disabled]="isLoading || !currentMessage.trim() || conversationEnded || isFormStep()"
                 [style.background-color]="settings.primaryColor"
                 class="send-button">
           <span *ngIf="!isLoading">➤</span>
@@ -72,9 +114,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   currentMessage: string = '';
   settings: ChatSettings = {} as ChatSettings;
   isLoading = false;
-  private threadId: string = '';
   conversationEnded = false;
-  currentStep: string = '';
+  currentStep: ChatStep = 'collect-name';
   private conversationId: string = '';
   leadData: any = {
     name: '',
@@ -97,8 +138,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   ngOnInit(): void {
     this.settingsSubscription = this.settingsService.settings$.subscribe(
       settings => {
-        this.settings = settings;
-        this.updateCSSVariables();
+        if (settings && Object.keys(settings).length > 0) {
+          this.settings = settings;
+          this.updateCSSVariables();
+          this.initializeChat();
+        }
       }
     );
   }
@@ -111,6 +155,19 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (this.shouldScrollToBottom) {
       this.scrollToBottom();
       this.shouldScrollToBottom = false;
+    }
+  }
+
+  private initializeChat(): void {
+    // Determine first step based on settings
+    if (this.settings.collectName) {
+      this.currentStep = 'collect-name';
+    } else if (this.settings.collectPhone) {
+      this.currentStep = 'collect-phone';
+    } else if (this.settings.collectProduct) {
+      this.currentStep = 'collect-product';
+    } else {
+      this.currentStep = 'ask-question';
     }
   }
 
@@ -130,21 +187,41 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   handleNameSubmit(): void {
     if (!this.leadData.name.trim()) return;
-    this.currentStep = 'collect-phone';
+    
+    if (this.settings.collectPhone) {
+      this.currentStep = 'collect-phone';
+    } else if (this.settings.collectProduct) {
+      this.currentStep = 'collect-product';
+    } else {
+      this.currentStep = 'ask-question';
+      this.addBotMessage('מה תרצה לדעת?');
+    }
     this.shouldScrollToBottom = true;
   }
 
   handlePhoneSubmit(): void {
     if (!this.leadData.phone.trim()) return;
-    this.currentStep = 'collect-product';
+    
+    if (this.settings.collectProduct) {
+      this.currentStep = 'collect-product';
+    } else {
+      this.currentStep = 'ask-question';
+      this.addBotMessage('מה תרצה לדעת?');
+    }
     this.shouldScrollToBottom = true;
   }
 
   handleProductSubmit(): void {
     if (!this.leadData.product) return;
+    
     this.currentStep = 'ask-question';
-    this.addBotMessage('מה תרצה לדעת?');
+    this.addBotMessage('Great! What would you like to ask or know first? 💬');
     this.shouldScrollToBottom = true;
+  }
+
+  selectProduct(product: string): void {
+    this.leadData.product = product;
+    this.handleProductSubmit();
   }
 
   sendMessage(): void {
@@ -181,14 +258,14 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.messages.push(loadingMessage);
     this.shouldScrollToBottom = true;
 
-    // Send to OpenAI
-    this.apiService.sendMessage(messageToSend, this.conversationId).subscribe({
+    // Send to webhook
+    this.apiService.sendMessageToWebhook(messageToSend, this.conversationId, this.settings.chatWebhookUrl).subscribe({
       next: (response) => {
         this.isLoading = false;
         // Remove loading message
         this.messages = this.messages.filter(msg => msg.id !== loadingMessage.id);
         
-        const answer = response.response || 'מצטער, לא הצלחתי לקבל תשובה';
+        const answer = response.response || response.answer || response.message || 'מצטער, לא הצלחתי לקבל תשובה';
         
         // Save question and answer
         this.leadData.questions.push({
@@ -231,10 +308,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     
     const leadDataWithConversation = {
       ...this.leadData,
-      conversationId: this.conversationId
+      conversationId: this.conversationId,
+      timestamp: new Date().toISOString(),
+      settings: this.settings
     };
     
-    this.apiService.submitLead(leadDataWithConversation).subscribe({
+    this.apiService.submitLeadToWebhook(leadDataWithConversation, this.settings.summaryWebhookUrl).subscribe({
       next: () => {
         this.isLoading = false;
         this.addBotMessage('תודה שפנית אלינו! נחזור אליך בהקדם.');
@@ -264,7 +343,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   resetChat(): void {
     this.messages = [];
-    this.currentStep = 'collect-name';
     this.conversationEnded = false;
     this.conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     this.leadData = {
@@ -273,6 +351,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       product: '',
       questions: []
     };
+    
+    this.initializeChat();
   }
 
   formatTime(timestamp: Date): string {
@@ -280,11 +360,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       hour: '2-digit', 
       minute: '2-digit' 
     });
-  }
-
-  minimizeChat(): void {
-    // This would be implemented to minimize the chat window
-    console.log('Minimize chat');
   }
 
   private scrollToBottom(): void {

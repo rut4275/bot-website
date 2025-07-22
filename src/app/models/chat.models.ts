@@ -8,6 +8,9 @@ export interface ChatMessage {
 
 export interface ChatSettings {
   webhookUrl: string;
+  chatWebhookUrl: string;
+  settingsWebhookUrl: string;
+  summaryWebhookUrl: string;
   openaiApiKey: string;
   products: string[];
   primaryColor: string;
@@ -21,6 +24,12 @@ export interface ChatSettings {
   chatIcon: string;
   botName: string;
   userPlaceholder: string;
+  collectName: boolean;
+  collectPhone: boolean;
+  collectProduct: boolean;
+  nameLabel: string;
+  phoneLabel: string;
+  productLabel: string;
 }
 
 export interface LeadData {

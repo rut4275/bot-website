@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import openai
+from openai import OpenAI
 import requests
 import json
 import os
@@ -120,9 +120,11 @@ def send_to_openai():
         print(f"[DEBUG] BEFORE OpenAI API call - Messages count: {len(openai_messages)}")
         print(f"[DEBUG] OpenAI request payload: {openai_messages}")
         
+        print(f"[DEBUG] client created api_key={settings['openaiApiKey']}")
         # Call OpenAI API
-        client = openai.OpenAI(api_key=settings['openaiApiKey'])
-        
+        client = OpenAI(api_key=str(settings['openaiApiKey']))
+        print(f"[DEBUG] client created")
+
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=openai_messages,
@@ -147,12 +149,12 @@ def send_to_openai():
             "conversationId": conversation_id
         })
         
-    except openai.AuthenticationError:
-        print("[DEBUG] OpenAI Authentication Error - Invalid API key")
-        return jsonify({"error": "מפתח OpenAI לא תקין"}), 401
-    except openai.RateLimitError:
-        print("[DEBUG] OpenAI Rate Limit Error")
-        return jsonify({"error": "חרגת ממגבלת הקריאות ל-OpenAI"}), 429
+    # except openai.AuthenticationError:
+    #     print("[DEBUG] OpenAI Authentication Error - Invalid API key")
+    #     return jsonify({"error": "מפתח OpenAI לא תקין"}), 401
+    # except openai.RateLimitError:
+    #     print("[DEBUG] OpenAI Rate Limit Error")
+    #     return jsonify({"error": "חרגת ממגבלת הקריאות ל-OpenAI"}), 429
     except Exception as e:
         print(f"[DEBUG] Error in OpenAI request: {str(e)}")
         return jsonify({"error": f"שגיאה בשליחה ל-OpenAI: {str(e)}"}), 500

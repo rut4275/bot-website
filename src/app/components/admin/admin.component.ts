@@ -27,12 +27,46 @@ import { SettingsService } from '../../services/settings.service';
         </div>
         
         <div *ngIf="isAuthenticated" class="admin-content">
+          <div class="webhook-section">
+            <h3>הגדרות Webhooks</h3>
+            
+            <div class="setting-group">
+              <label>Webhook עבור הודעות צ'אט:</label>
+              <input type="url" [(ngModel)]="settings.chatWebhookUrl" class="setting-input"
+                     placeholder="https://api.example.com/chat">
+              <small>כתובת ה-webhook שיקבל הודעות מהמשתמש ויחזיר תשובות</small>
+            </div>
+            
+            <div class="setting-group">
+              <label>Webhook עבור הגדרות:</label>
+              <input type="url" [(ngModel)]="settings.settingsWebhookUrl" class="setting-input"
+                     placeholder="https://api.example.com/settings">
+              <small>כתובת ה-webhook לשמירה וטעינה של הגדרות</small>
+            </div>
+            
+            <div class="setting-group">
+              <label>Webhook עבור סיכום שיחה:</label>
+              <input type="url" [(ngModel)]="settings.summaryWebhookUrl" class="setting-input"
+                     placeholder="https://api.example.com/summary">
+              <small>כתובת ה-webhook שיקבל את סיכום השיחה והליד</small>
+            </div>
+            
+            <div class="setting-group">
+              <label>Webhook כללי (לתאימות לאחור):</label>
+              <input type="url" [(ngModel)]="settings.webhookUrl" class="setting-input"
+                     placeholder="https://api.example.com/webhook">
+              <small>כתובת webhook כללית</small>
+            </div>
+          </div>
+          
           <div class="settings-section">
             <h3>הגדרות כלליות</h3>
             
             <div class="setting-group">
-              <label>כתובת Webhook:</label>
-              <input type="url" [(ngModel)]="settings.webhookUrl" class="setting-input">
+              <label>מפתח OpenAI API:</label>
+              <input type="password" [(ngModel)]="settings.openaiApiKey" class="setting-input"
+                     placeholder="sk-...">
+              <small>מפתח API של OpenAI (אופציונלי - תלוי ב-webhook)</small>
             </div>
             
             <div class="setting-group">
@@ -58,6 +92,48 @@ import { SettingsService } from '../../services/settings.service';
             <div class="setting-group">
               <label>אייקון הצ'אט:</label>
               <input type="text" [(ngModel)]="settings.chatIcon" class="setting-input">
+            </div>
+          </div>
+          
+          <div class="collection-section">
+            <h3>הגדרות איסוף נתונים</h3>
+            
+            <div class="setting-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="settings.collectName" class="setting-checkbox">
+                איסוף שם
+              </label>
+              <input type="text" [(ngModel)]="settings.nameLabel" class="setting-input"
+                     [disabled]="!settings.collectName"
+                     placeholder="מה השם שלך?">
+            </div>
+            
+            <div class="setting-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="settings.collectPhone" class="setting-checkbox">
+                איסוף טלפון
+              </label>
+              <input type="text" [(ngModel)]="settings.phoneLabel" class="setting-input"
+                     [disabled]="!settings.collectPhone"
+                     placeholder="מה מספר הטלפון שלך?">
+            </div>
+            
+            <div class="setting-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="settings.collectProduct" class="setting-checkbox">
+                איסוף מוצר
+              </label>
+              <input type="text" [(ngModel)]="settings.productLabel" class="setting-input"
+                     [disabled]="!settings.collectProduct"
+                     placeholder="איזה מוצר מעניין אותך?">
+            </div>
+            
+            <div class="setting-group">
+              <label>רשימת מוצרים (מוצר בכל שורה):</label>
+              <textarea [(ngModel)]="productsText" 
+                        (ngModelChange)="updateProducts()"
+                        class="setting-textarea"
+                        placeholder="מוצר 1&#10;מוצר 2&#10;מוצר 3"></textarea>
             </div>
           </div>
           
@@ -142,6 +218,10 @@ export class AdminComponent implements OnInit {
         this.productsText = this.settings.products ? this.settings.products.join('\n') : '';
       }
     });
+  }
+
+  updateProducts(): void {
+    this.settings.products = this.productsText.split('\n').filter(p => p.trim().length > 0);
   }
 
   openAdmin(): void {

@@ -1,76 +1,6695 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, of } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
-import { ChatSettings } from '../models/chat.models';
-import { ApiService } from './api.service';
+color-color>
++  console.log("hello");
++}
 
-@Injectable({
-  providedIn: 'root'
-})
-export class SettingsService {
-  private settingsSubject = new BehaviorSubject<ChatSettings>({} as ChatSettings);
-  public settings$ = this.settingsSubject.asObservable();
+import { from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { catchError, tap } from 'rxjs';
+import { map } from 'rxjs';
+import { mergeMap, switchMap } from 'rxjs/operators';
 
-  constructor(private apiService: ApiService) {
-    this.loadSettings();
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: null };
+    this._settings = new BehaviorSubject<AppSettings>(null);
   }
 
-  private loadSettings(): void {
-    this.apiService.getSettings().pipe(
-      catchError(error => {
-        console.error('Error loading settings from server:', error);
-        // Return default settings if server is not available
-        return of({
-          webhookUrl: 'https://api.example.com/webhook',
-          openaiApiKey: '',
-          products: ['מוצר 1', 'מוצר 2', 'מוצר 3'],
-          primaryColor: '#2563eb',
-          secondaryColor: '#6b7280',
-          textColor: '#1f2937',
-          backgroundColor: '#ffffff',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontSize: '14px',
-          welcomeMessage: 'שלום! איך אני יכול לעזור לך היום?',
-          chatTitle: 'צ\'אטבוט',
-          chatIcon: '💬',
-          botName: 'עוזר',
-          userPlaceholder: 'הקלד הודעה...'
-        } as ChatSettings);
-      })
-    ).subscribe(settings => {
-      this.settingsSubject.next(settings);
-    });
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
   }
 
-  updateSettings(newSettings: Partial<ChatSettings>): void {
-    this.apiService.updateSettings(newSettings).pipe(
-      tap(response => {
-        if (response.settings) {
-          this.settingsSubject.next(response.settings);
-        }
-      }),
-      catchError(error => {
-        console.error('Error updating settings:', error);
-        return of(null);
-      })
-    ).subscribe();
+  loadSettings(): void {
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(this.handleError<AppSettings>('loadSettings'))
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = data;
+          this._settings.next(Object.assign({}, this.dataStore).settings);
+        },
+        error => console.log('Could not load settings.')
+      );
   }
 
-  getSettings(): ChatSettings {
-    return this.settingsSubject.value;
+  updateSettings(settings: AppSettings): void {
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = data;
+          this._settings.next(Object.assign({}, this.dataStore).settings);
+        },
+        error => console.log('Could not update settings.')
+      );
   }
 
-  resetSettings(): void {
-    this.apiService.resetSettings().pipe(
-      tap(response => {
-        if (response.settings) {
-          this.settingsSubject.next(response.settings);
-        }
-      }),
-      catchError(error => {
-        console.error('Error resetting settings:', error);
-        return of(null);
-      })
-    ).subscribe();
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
   }
 }
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from server first, fallback to localStorage
+    this.http.get<AppSettings>('/api/settings')
+      .pipe(
+        catchError(() => {
+          // If server request fails, use localStorage data
+          return of(this.dataStore.settings);
+        })
+      )
+      .subscribe(
+        data => {
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => console.log('Could not load settings.')
+      );
+  }
+
+  updateSettings(settings: AppSettings): void {
+    // Save to localStorage immediately
+    settings.saveToLocalStorage();
+    this.dataStore.settings = settings;
+    this._settings.next(this.dataStore.settings);
+
+    // Try to save to server
+    this.http.put<AppSettings>('/api/settings', settings)
+      .pipe(
+        catchError(this.handleError<AppSettings>('updateSettings'))
+      )
+      .subscribe(
+        data => {
+          // Server save successful, update with server response
+          this.dataStore.settings = new AppSettings(data);
+          this.dataStore.settings.saveToLocalStorage();
+          this._settings.next(this.dataStore.settings);
+        },
+        error => {
+          console.log('Could not save settings to server, but saved locally.');
+        }
+      );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(error);
+      console.log(`${operation} failed: ${error.message}`);
+      return of(result as T);
+    };
+  }
+}
+
+export interface AppSettings {
+  openaiApiKey: string;
+}
+
+export class AppSettings {
+  openaiApiKey: string = '';
+
+  constructor(data?: any) {
+    if (data) {
+      this.openaiApiKey = data.openaiApiKey || '';
+    }
+  }
+
+  saveToLocalStorage(): void {
+    localStorage.setItem('appSettings', JSON.stringify(this));
+  }
+
+  static loadFromLocalStorage(): AppSettings {
+    const data = localStorage.getItem('appSettings');
+    if (data) {
+      try {
+        return new AppSettings(JSON.parse(data));
+      } catch (error) {
+        console.error('Error parsing settings from localStorage:', error);
+      }
+    }
+    return new AppSettings();
+  }
+}
+
+@Injectable()
+export class AppSettingsService {
+  private _settings: BehaviorSubject<AppSettings>;
+  private dataStore: {
+    settings: AppSettings;
+  };
+
+  constructor(private http: HttpClient) {
+    this.dataStore = { settings: AppSettings.loadFromLocalStorage() };
+    this._settings = new BehaviorSubject<AppSettings>(this.dataStore.settings);
+  }
+
+  get settings(): Observable<AppSettings> {
+    return this._settings.asObservable();
+  }
+
+  loadSettings(): void {
+    // Try to load from

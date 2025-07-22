@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
+import { Observable, throwError, of } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
 import { ChatSettings, LeadData } from '../models/chat.models';
 
@@ -8,55 +8,61 @@ import { ChatSettings, LeadData } from '../models/chat.models';
   providedIn: 'root'
 })
 export class ApiService {
-  private readonly baseUrl = 'http://localhost:5000/api';
-
   constructor(private http: HttpClient) {}
 
-  // Settings endpoints
-  getSettings(): Observable<ChatSettings> {
-    return this.http.get<ChatSettings>(`${this.baseUrl}/settings`).pipe(
-      timeout(10000),
-      catchError(this.handleError)
-    );
-  }
+  // Chat message to webhook
+  sendMessageToWebhook(message: string, conversationId: string, webhookUrl: string): Observable<any> {
+    if (!webhookUrl || webhookUrl === 'https://api.example.com/chat') {
+      return throwError(() => new Error('לא הוגדר webhook עבור הצ\'אט'));
+    }
 
-  updateSettings(settings: Partial<ChatSettings>): Observable<any> {
-    return this.http.post(`${this.baseUrl}/settings`, settings).pipe(
-      timeout(10000),
-      catchError(this.handleError)
-    );
-  }
-
-  resetSettings(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/settings/reset`, {}).pipe(
-      timeout(10000),
-      catchError(this.handleError)
-    );
-  }
-
-  // Chat endpoints
-  sendMessage(message: string, conversationId: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/chat/send`, {
+    const payload = {
       message,
-      conversationId
+      conversationId,
+      timestamp: new Date().toISOString()
+    };
+    
+    return this.http.post(webhookUrl, payload, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }).pipe(
-      timeout(60000), // 60 seconds for OpenAI calls
+      timeout(60000), // 60 seconds for chat responses
       catchError(this.handleError)
     );
   }
 
-  // Lead submission
-  submitLead(leadData: LeadData & { conversationId: string }): Observable<any> {
-    return this.http.post(`${this.baseUrl}/lead/submit`, leadData).pipe(
+  // Settings via webhook
+  getSettingsFromWebhook(webhookUrl: string): Observable<ChatSettings> {
+    if (!webhookUrl || webhookUrl === 'https://api.example.com/settings') {
+      return of({} as ChatSettings);
+    }
+
+    return this.http.get<ChatSettings>(webhookUrl).pipe(
+      timeout(10000),
+      catchError(() => of({} as ChatSettings))
+    );
+  }
+
+  updateSettingsViaWebhook(settings: Partial<ChatSettings>, webhookUrl: string): Observable<any> {
+    if (!webhookUrl || webhookUrl === 'https://api.example.com/settings') {
+      return of({ message: 'Settings saved locally (no webhook configured)' });
+    }
+
+    return this.http.post(webhookUrl, settings).pipe(
+      timeout(10000),
+      catchError(this.handleError)
+    );
+  }
+
+  // Lead submission with conversation summary
+  submitLeadToWebhook(leadData: LeadData & { conversationId: string }, webhookUrl: string): Observable<any> {
+    if (!webhookUrl || webhookUrl === 'https://api.example.com/summary') {
+      return of({ message: 'Lead saved locally (no webhook configured)' });
+    }
+
+    return this.http.post(webhookUrl, leadData).pipe(
       timeout(30000),
-      catchError(this.handleError)
-    );
-  }
-
-  // Health check
-  healthCheck(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/health`).pipe(
-      timeout(5000),
       catchError(this.handleError)
     );
   }
@@ -65,9 +71,9 @@ export class ApiService {
     let errorMessage = 'נראה שיש בעיה, אנא נסה שוב בעוד מספר דקות';
     
     if (error.status === 0) {
-      errorMessage = 'לא ניתן להתחבר לשרת, אנא ודא שהשרת פועל';
+      errorMessage = 'לא ניתן להתחבר לשרת, אנא ודא שה-webhook פועל';
     } else if (error.status === 401) {
-      errorMessage = 'מפתח OpenAI לא תקין';
+      errorMessage = 'שגיאת הרשאה';
     } else if (error.status === 429) {
       errorMessage = 'חרגת ממגבלת הקריאות, אנא נסה שוב מאוחר יותר';
     } else if (error.error?.error) {
