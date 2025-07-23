@@ -21,52 +21,6 @@ import { ApiService } from '../../services/api.service';
       </div>
       
       <div class="chat-messages" #messagesContainer>
-        <div class="welcome-message" [style.color]="settings.secondaryColor">
-          {{ settings.welcomeMessage }}
-        </div>
-        
-        <!-- Lead Form -->
-        <div *ngIf="isFormStep()" class="lead-form">
-          <!-- Name Collection -->
-          <div *ngIf="currentStep === 'collect-name'" class="form-step">
-            <p>{{ settings.nameLabel }}</p>
-            <input type="text" 
-                   [(ngModel)]="leadData.name" 
-                   (keyup.enter)="handleNameSubmit()"
-                   placeholder="הכנס את שמך"
-                   class="lead-input">
-            <button (click)="handleNameSubmit()" 
-                    [disabled]="!leadData.name.trim()"
-                    class="lead-button">המשך</button>
-          </div>
-          
-          <!-- Phone Collection -->
-          <div *ngIf="currentStep === 'collect-phone'" class="form-step">
-            <p>{{ settings.phoneLabel }}</p>
-            <input type="tel" 
-                   [(ngModel)]="leadData.phone" 
-                   (keyup.enter)="handlePhoneSubmit()"
-                   placeholder="הכנס מספר טלפון"
-                   class="lead-input">
-            <button (click)="handlePhoneSubmit()" 
-                    [disabled]="!leadData.phone.trim()"
-                    class="lead-button">המשך</button>
-          </div>
-          
-          <!-- Product Collection -->
-          <div *ngIf="currentStep === 'collect-product'" class="form-step">
-            <p>{{ settings.productLabel }}</p>
-            <select [(ngModel)]="leadData.product" 
-                    (change)="handleProductSubmit()"
-                    class="lead-select">
-              <option value="">בחר מוצר</option>
-              <option *ngFor="let product of settings.products" [value]="product">
-                {{ product }}
-              </option>
-            </select>
-          </div>
-        </div>
-        
         <div *ngFor="let message of messages" class="message-wrapper">
           <div class="message" 
                [class.user-message]="message.isUser"
@@ -74,6 +28,14 @@ import { ApiService } from '../../services/api.service';
                [style.background-color]="message.isUser ? settings.primaryColor : '#f3f4f6'"
                [style.color]="message.isUser ? settings.backgroundColor : settings.textColor">
             <div class="message-content">{{ message.text }}</div>
+            <div *ngIf="message.buttons && message.buttons.length > 0">
+              <button *ngFor="let button1 of message.buttons" 
+                      (click)="selectProduct(button1)"
+                      [style.background-color]="settings.secondaryColor"
+                      [style.color]="settings.textColor"
+                      class="product-button">
+                {{ button1 }}
+              </button>
             <div class="message-time">{{ formatTime(message.timestamp) }}</div>
             <div *ngIf="message.status === 'sending'" class="sending-indicator">
               <div class="dots">
@@ -83,6 +45,16 @@ import { ApiService } from '../../services/api.service';
               </div>
             </div>
           </div>
+          
+          <!-- Product selection buttons -->
+          <!-- <div *ngIf="showProductButtons && message === messages[messages.length - 1] && !message.isUser" 
+               class="product-buttons">
+            <button *ngFor="let product of settings.products" 
+                    (click)="selectProduct(product)"
+                    class="product-button">
+              {{ product }}
+            </button>
+          </div> -->
         </div>
       </div>
       
@@ -91,12 +63,12 @@ import { ApiService } from '../../services/api.service';
                [(ngModel)]="currentMessage" 
                (keyup.enter)="sendMessage()"
                [placeholder]="settings.userPlaceholder"
-               [disabled]="isLoading || isFormStep() || conversationEnded"
+               [disabled]="isLoading || showProductButtons || conversationEnded || waitingForResponse"
                [style.font-family]="settings.fontFamily"
                [style.font-size]="settings.fontSize"
                class="message-input">
         <button (click)="sendMessage()" 
-                [disabled]="isLoading || !currentMessage.trim() || conversationEnded || isFormStep()"
+                [disabled]="isLoading || !currentMessage.trim() || conversationEnded || showProductButtons"
                 [style.background-color]="settings.primaryColor"
                 class="send-button">
           <span *ngIf="!isLoading">➤</span>
@@ -115,6 +87,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   settings: ChatSettings = {} as ChatSettings;
   isLoading = false;
   conversationEnded = false;
+  waitingForResponse = false;
+  showProductButtons = false;
   currentStep: ChatStep = 'collect-name';
   private conversationId: string = '';
   leadData: any = {
@@ -141,7 +115,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         if (settings && Object.keys(settings).length > 0) {
           this.settings = settings;
           this.updateCSSVariables();
-          this.initializeChat();
+          // Start the chat flow immediately
+          setTimeout(() => {
+            this.startChatFlow();
+          }, 500);
         }
       }
     );
@@ -158,16 +135,22 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  private initializeChat(): void {
+  initializeChat(): void {
     // Determine first step based on settings
     if (this.settings.collectName) {
       this.currentStep = 'collect-name';
+      this.addBotMessage(this.settings.nameLabel || 'הי! נשמח להכיר אותך!\n מה השם שלך?');
     } else if (this.settings.collectPhone) {
       this.currentStep = 'collect-phone';
+      this.addBotMessage(this.settings.phoneLabel || 'הי! נשמח להכיר אותך!\nמה מספר הטלפון שלך?');
     } else if (this.settings.collectProduct) {
       this.currentStep = 'collect-product';
+      this.addBotMessage(this.settings.productLabel || 'הי! נשמח להכיר אותך!\nאיזה מוצר מעניין אותך?');
+      this.showProductButtons = true;
+      this.addBotMessage('בחר מוצר כדי להמשיך:');
     } else {
       this.currentStep = 'ask-question';
+      this.addBotMessage('הי! איך אפשר לעזור לך היום?');
     }
   }
 
@@ -190,12 +173,17 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     
     if (this.settings.collectPhone) {
       this.currentStep = 'collect-phone';
-    } else if (this.settings.collectProduct) {
+      this.addBotMessage(this.settings.phoneLabel || 'מעולה! מה מספר הטלפון שלך?');
+    }else if (this.settings.collectProduct) {
       this.currentStep = 'collect-product';
+      this.addBotMessage(this.settings.productLabel || 'מעולה! איזה מוצר מעניין אותך?');
+      this.showProductButtons = true;
+      this.addBotMessage('בחר מוצר כדי להמשיך:');
     } else {
       this.currentStep = 'ask-question';
-      this.addBotMessage('מה תרצה לדעת?');
+      this.addBotMessage('מעולה! מה היית רוצה לדעת או לשאול בהתחלה? 💬');
     }
+    this.currentMessage = '';
     this.shouldScrollToBottom = true;
   }
 
@@ -204,6 +192,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     
     if (this.settings.collectProduct) {
       this.currentStep = 'collect-product';
+      this.addBotMessage(this.settings.productLabel || 'מעולה! איזה מוצר מעניין אותך?',this.settings.products);
+      this.showProductButtons = true;
+      this.addBotMessage('בחר מוצר כדי להמשיך:');
     } else {
       this.currentStep = 'ask-question';
       this.addBotMessage('מה תרצה לדעת?');
@@ -215,7 +206,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (!this.leadData.product) return;
     
     this.currentStep = 'ask-question';
-    this.addBotMessage('Great! What would you like to ask or know first? 💬');
+    this.addBotMessage('מעולה! מה היית רוצה לדעת או לשאול בהתחלה? 💬');
     this.shouldScrollToBottom = true;
   }
 
@@ -224,8 +215,31 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.handleProductSubmit();
   }
 
+  startChatFlow(): void {
+    this.initializeChat();
+    // this.handleNameSubmit();
+    // this.handlePhoneSubmit();
+    // this.handleProductSubmit();
+    
+  }
+
   sendMessage(): void {
-    if (!this.currentMessage.trim() || this.isLoading || this.isFormStep()) return;
+    if (!this.currentMessage.trim() || this.isLoading ) return;
+
+    if(this.isFormStep()){
+      if (this.currentStep === 'collect-name') {
+        this.leadData.name = this.currentMessage.trim();
+        this.handleNameSubmit();
+      } else if (this.currentStep === 'collect-phone') {
+        this.leadData.phone = this.currentMessage.trim();
+        this.handlePhoneSubmit();
+      } else if (this.currentStep === 'collect-product') {
+        this.leadData.product = this.currentMessage.trim();
+        this.handleProductSubmit();
+      }
+      this.currentMessage = '';
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -329,13 +343,14 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     });
   }
 
-  addBotMessage(text: string): void {
+  addBotMessage(text: string, products?: string[] ): void {
     const botMessage: ChatMessage = {
       id: Date.now().toString(),
       text: text,
       isUser: false,
       timestamp: new Date(),
-      status: 'sent'
+      status: 'sent',
+      buttons: products ? products.map(product => product) : undefined
     };
     this.messages.push(botMessage);
     this.shouldScrollToBottom = true;
@@ -344,6 +359,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   resetChat(): void {
     this.messages = [];
     this.conversationEnded = false;
+    this.showProductButtons = false;
+    this.waitingForResponse = true;
     this.conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     this.leadData = {
       name: '',
@@ -352,7 +369,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       questions: []
     };
     
-    this.initializeChat();
+    this.startChatFlow();
   }
 
   formatTime(timestamp: Date): string {
@@ -368,5 +385,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     } catch (err) {
       console.error('Error scrolling to bottom:', err);
     }
+  }
+
+  minimizeChat(): void {
+    window.parent.postMessage({ type: 'closeChat' }, '*');
   }
 }

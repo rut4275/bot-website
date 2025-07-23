@@ -3,6 +3,7 @@ export interface ChatMessage {
   text: string;
   isUser: boolean;
   timestamp: Date;
+  buttons?: string[];
   status?: 'sending' | 'sent' | 'error';
 }
 

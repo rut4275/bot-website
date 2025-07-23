@@ -342,6 +342,13 @@ export class AdminComponent implements OnInit {
     }
   });
   
+  // Listen for close messages from the chat iframe
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'closeChat') {
+      chatOverlay.style.display = 'none';
+    }
+  });
+  
   document.body.appendChild(chatIcon);
   document.body.appendChild(chatOverlay);
 })();
