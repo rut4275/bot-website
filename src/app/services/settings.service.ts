@@ -12,12 +12,12 @@ export class SettingsService {
   private readonly DEFAULT_SETTINGS: ChatSettings = {
     webhookUrl: "https://api.example.com/webhook",
     chatWebhookUrl: "https://api.example.com/chat",
-    settingsWebhookUrl: "https://api.example.com/settings",
+    settingsWebhookUrl: "https://hook.eu2.make.com/eu471t35hq1r7mbg1q6wbzo45c31e5a9",
     summaryWebhookUrl: "https://api.example.com/summary",
     openaiApiKey: "",
     products: ["Product 1", "Product 2", "Product 3"],
-    primaryColor: "#2563eb",
-    secondaryColor: "#6b7280",
+    primaryColor: "#2f8914ff",
+    secondaryColor: "#19f035ff",
     textColor: "#1f2937",
     backgroundColor: "#ffffff",
     fontFamily: "system-ui, -apple-system, sans-serif",
@@ -41,39 +41,57 @@ export class SettingsService {
   public settings$ = this.settingsSubject.asObservable();
 
   constructor(private http: HttpClient) {
-    this.loadSettings();
+    // this.loadSettings();
   }
 
-  private loadSettings(): void {
-    // Try to load from localStorage first
-    const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsedSettings = JSON.parse(stored);
-        const mergedSettings = { ...this.DEFAULT_SETTINGS, ...parsedSettings };
-        this.settingsSubject.next(mergedSettings);
-      } catch (error) {
-        console.error('Error parsing stored settings:', error);
-        this.settingsSubject.next(this.DEFAULT_SETTINGS);
-      }
-    }
-
-    // Try to load from webhook if configured
+  public loadSettingsAndNotify(): Observable<ChatSettings> {
+  return new Observable<ChatSettings>(observer => {
     const currentSettings = this.settingsSubject.value;
-    if (currentSettings.settingsWebhookUrl && 
+
+    if (currentSettings.settingsWebhookUrl &&
         currentSettings.settingsWebhookUrl !== 'https://api.example.com/settings') {
       this.loadFromWebhook(currentSettings.settingsWebhookUrl).subscribe({
         next: (data: ChatSettings) => {
           const mergedSettings = { ...this.DEFAULT_SETTINGS, ...data };
           this.settingsSubject.next(mergedSettings);
           this.saveToLocalStorage();
+          observer.next(mergedSettings);
+          observer.complete();
         },
         error: (error) => {
           console.warn('Failed to load settings from webhook:', error);
+          const fallback = this.loadFromLocalStorageOrDefault();
+          observer.next(fallback);
+          observer.complete();
         }
       });
+    } else {
+      const fallback = this.loadFromLocalStorageOrDefault();
+      observer.next(fallback);
+      observer.complete();
     }
+  });
+}
+
+// פונקציה נוספת לטעינה מ-localStorage או ברירת מחדל
+private loadFromLocalStorageOrDefault(): ChatSettings  {
+  const stored = localStorage.getItem(this.STORAGE_KEY);
+  if (stored) {
+    try {
+      const parsedSettings = JSON.parse(stored);
+      const mergedSettings = { ...this.DEFAULT_SETTINGS, ...parsedSettings };
+      this.settingsSubject.next(mergedSettings);
+      return mergedSettings;
+    } catch (error) {
+      console.error('Error parsing stored settings:', error);
+      this.settingsSubject.next(this.DEFAULT_SETTINGS);
+    }
+  } else {
+    this.settingsSubject.next(this.DEFAULT_SETTINGS);
+    return this.DEFAULT_SETTINGS;
   }
+  return this.DEFAULT_SETTINGS;
+}
 
   private loadFromWebhook(webhookUrl: string): Observable<ChatSettings> {
     return this.http.get<ChatSettings>(webhookUrl).pipe(

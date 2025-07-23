@@ -101,6 +101,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     product: '',
     questions: []
   };
+  threadId: string = '';
   
   private settingsSubscription?: Subscription;
   private shouldScrollToBottom = false;
@@ -114,19 +115,22 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   ngOnInit(): void {
-    this.settingsSubscription = this.settingsService.settings$.subscribe(
-      settings => {
-        if (settings && Object.keys(settings).length > 0) {
-          this.settings = settings;
-          this.updateCSSVariables();
-          // Start the chat flow immediately
-          setTimeout(() => {
-            this.startChatFlow();
-          }, 500);
-        }
+  // נרשמים ל-settings כדי לעדכן עיצוב וכולי
+  this.settingsSubscription = this.settingsService.settings$.subscribe(
+    settings => {
+      if (settings && Object.keys(settings).length > 0) {
+        this.settings = settings;
+        this.updateCSSVariables();
       }
-    );
-  }
+    }
+  );
+
+  // מריצים את הטעינה וברגע שהיא מסתיימת – מפעילים את ה-chat flow
+  this.settingsService.loadSettingsAndNotify().subscribe(() => {
+    this.startChatFlow();
+  });
+}
+
 
   ngOnDestroy(): void {
     this.settingsSubscription?.unsubscribe();
@@ -298,8 +302,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.isLoading = false;
         // Remove loading message
         this.messages = this.messages.filter(msg => msg.id !== loadingMessage.id);
-        
-        const answer = response.response || response.answer || response.message || 'מצטער, לא הצלחתי לקבל תשובה';
+
+        this.threadId = response.threadId || this.threadId;
+        const answer = response.result || response.answer || response.message || 'מצטער, נראה שיש בעיה, אנא נסה שוב בעוד מספר דקות';
         
         // Save question and answer
         this.leadData.questions.push({
