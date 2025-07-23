@@ -51,8 +51,6 @@ export type ChatStep =
   | 'collect-phone' 
   | 'collect-product'
   | 'ask-question'
-  | 'answer-question'
-  | 'ask-continue'
   | 'completed';
 
 export interface AdminConfig {

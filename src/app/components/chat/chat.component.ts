@@ -37,6 +37,7 @@ import { AdminComponent } from '../admin/admin.component';
                       class="product-button">
                 {{ button1 }}
               </button>
+            </div>
             <div class="message-time">{{ formatTime(message.timestamp) }}</div>
             <div *ngIf="message.status === 'sending'" class="sending-indicator">
               <div class="dots">
@@ -112,6 +113,26 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   ) {
     // Generate unique conversation ID
     this.conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  formatTime(timestamp: Date): string {
+    return timestamp.toLocaleTimeString('he-IL', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  }
+
+  addBotMessage(text: string, products?: string[]): void {
+    const botMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text: text,
+      isUser: false,
+      timestamp: new Date(),
+      status: 'sent',
+      buttons: products ? products.map(product => product) : undefined
+    };
+    this.messages.push(botMessage);
+    this.shouldScrollToBottom = true;
   }
 
   ngOnInit(): void {
@@ -276,11 +297,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.messages.push(userMessage);
     this.shouldScrollToBottom = true;
 
-    if (this.currentStep === 'ask-continue') {
-      this.handleContinueResponse(this.currentMessage);
-      return;
-    }
-
+    // if (this.currentStep === 'ask-continue') {
+    //   this.handleContinueResponse(this.currentMessage);
+    // }
     const messageToSend = this.currentMessage;
     this.currentMessage = '';
     this.isLoading = true;
@@ -297,7 +316,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.shouldScrollToBottom = true;
 
     // Send to webhook
-    this.apiService.sendMessageToWebhook(messageToSend, this.conversationId, this.settings.chatWebhookUrl).subscribe({
+    this.apiService.sendMessageToWebhook(messageToSend, this.threadId, this.conversationId, this.settings.chatWebhookUrl).subscribe({
       next: (response) => {
         this.isLoading = false;
         // Remove loading message
@@ -315,11 +334,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         
         this.addBotMessage(answer);
         
-        // Ask if user has more questions
-        setTimeout(() => {
-          this.addBotMessage('יש לך עוד שאלה או זה הכל?');
-          this.currentStep = 'ask-continue';
-        }, 1000);
       },
       error: (error) => {
         this.isLoading = false;
@@ -328,18 +342,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.addBotMessage(error.message);
       }
     });
-  }
-
-  handleContinueResponse(response: string): void {
-    const lowerResponse = response.toLowerCase();
-    
-    if (lowerResponse.includes('כן') || lowerResponse.includes('עוד') || lowerResponse.includes('שאלה')) {
-      this.addBotMessage('איך עוד אני יכול לעזור לך?');
-      this.currentStep = 'ask-question';
-    } else {
-      // User is done, send lead data
-      this.sendLeadData();
-    }
   }
 
   sendLeadData(): void {
@@ -368,19 +370,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     });
   }
 
-  addBotMessage(text: string, products?: string[] ): void {
-    const botMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: text,
-      isUser: false,
-      timestamp: new Date(),
-      status: 'sent',
-      buttons: products ? products.map(product => product) : undefined
-    };
-    this.messages.push(botMessage);
-    this.shouldScrollToBottom = true;
-  }
-
   resetChat(): void {
     this.messages = [];
     this.conversationEnded = false;
@@ -395,13 +384,6 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     };
     
     this.startChatFlow();
-  }
-
-  formatTime(timestamp: Date): string {
-    return timestamp.toLocaleTimeString('he-IL', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
   }
 
   private scrollToBottom(): void {

@@ -11,7 +11,7 @@ export class ApiService {
   constructor(private http: HttpClient) {}
 
   // Chat message to webhook
-  sendMessageToWebhook(message: string, conversationId: string, webhookUrl: string): Observable<any> {
+  sendMessageToWebhook(message: string,threadId: string, conversationId: string, webhookUrl: string): Observable<any> {
     if (!webhookUrl || webhookUrl === 'https://api.example.com/chat') {
       return throwError(() => new Error('לא הוגדר webhook עבור הצ\'אט'));
     }
@@ -19,6 +19,7 @@ export class ApiService {
     const payload = {
       message,
       conversationId,
+      threadId,
       timestamp: new Date().toISOString()
     };
     
