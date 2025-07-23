@@ -5,11 +5,12 @@ import { Subscription } from 'rxjs';
 import { ChatMessage, ChatSettings, ChatStep } from '../../models/chat.models';
 import { SettingsService } from '../../services/settings.service';
 import { ApiService } from '../../services/api.service';
+import { AdminComponent } from '../admin/admin.component';
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AdminComponent],
   template: `
     <div class="chat-container" [style.background-color]="settings.backgroundColor">
       <div class="chat-header" [style.background-color]="settings.primaryColor">
@@ -28,7 +29,7 @@ import { ApiService } from '../../services/api.service';
                [style.background-color]="message.isUser ? settings.primaryColor : '#f3f4f6'"
                [style.color]="message.isUser ? settings.backgroundColor : settings.textColor">
             <div class="message-content">{{ message.text }}</div>
-            <div *ngIf="message.buttons && message.buttons.length > 0">
+            <div *ngIf="message.buttons && message.buttons.length > 0" class="product-buttons">
               <button *ngFor="let button1 of message.buttons" 
                       (click)="selectProduct(button1)"
                       [style.background-color]="settings.secondaryColor"
@@ -75,12 +76,15 @@ import { ApiService } from '../../services/api.service';
           <div *ngIf="isLoading" class="loading-spinner"></div>
         </button>
       </div>
+      
+      <app-admin></app-admin>
     </div>
   `,
   styleUrls: ['./chat.component.css']
 })
 export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
+  @ViewChild(AdminComponent) adminPanel!: AdminComponent;
   
   messages: ChatMessage[] = [];
   currentMessage: string = '';
@@ -211,8 +215,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   selectProduct(product: string): void {
-    this.leadData.product = product;
-    this.handleProductSubmit();
+    this.currentMessage = product;
+    this.sendMessage();
+    this.showProductButtons = false;
   }
 
   startChatFlow(): void {
@@ -227,11 +232,26 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (!this.currentMessage.trim() || this.isLoading ) return;
 
     if(this.isFormStep()){
+       
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: this.currentMessage,
+        isUser: true,
+        timestamp: new Date(),
+        status: 'sent'
+      };
+
+      this.messages.push(userMessage);
+      this.shouldScrollToBottom = true;
       if (this.currentStep === 'collect-name') {
         this.leadData.name = this.currentMessage.trim();
         this.handleNameSubmit();
       } else if (this.currentStep === 'collect-phone') {
         this.leadData.phone = this.currentMessage.trim();
+        if(this.leadData.phone === this.settings.adminPhone && this.leadData.name === this.settings.adminaName) {
+          this.openAdminPanel();
+          return;
+        }
         this.handlePhoneSubmit();
       } else if (this.currentStep === 'collect-product') {
         this.leadData.product = this.currentMessage.trim();
@@ -389,5 +409,15 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   minimizeChat(): void {
     window.parent.postMessage({ type: 'closeChat' }, '*');
+  }
+  
+  openAdminPanel(): void {
+    const password = prompt('הזן סיסמת מנהל:');
+    if (password === 'admin123') {
+      this.adminPanel.openAdmin();
+      this.adminPanel.isAuthenticated = true;
+    } else if (password !== null) {
+      alert('סיסמה שגויה');
+    }
   }
 }

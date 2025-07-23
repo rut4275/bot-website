@@ -31,6 +31,8 @@ export interface ChatSettings {
   nameLabel: string;
   phoneLabel: string;
   productLabel: string;
+  adminaName: string;
+  adminPhone: string;
 }
 
 export interface LeadData {

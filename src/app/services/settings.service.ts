@@ -32,7 +32,9 @@ export class SettingsService {
     collectProduct: true,
     nameLabel: "היי! נעים להכיר 😊 איך קוראים לך?",
     phoneLabel: "אשמח גם למספר הטלפון שלך, כדי שנוכל לחזור אליך אם נצטרך 📞",
-    productLabel: "באיזה מוצר או שירות שלנו אתה הכי מתעניין? 📦"
+    productLabel: "באיזה מוצר או שירות שלנו אתה הכי מתעניין? 📦",
+    adminaName: "רות סהר מנהלת",
+    adminPhone: "0534193391"
   };
 
   private settingsSubject = new BehaviorSubject<ChatSettings>(this.DEFAULT_SETTINGS);
