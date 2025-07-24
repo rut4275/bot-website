@@ -16,9 +16,10 @@ import { AdminComponent } from '../admin/admin.component';
       <div class="chat-header" [style.background-color]="settings.primaryColor">
         <div class="chat-icon">{{ settings.chatIcon }}</div>
         <h3 [style.color]="settings.backgroundColor">{{ settings.chatTitle }}</h3>
+         <!--  
         <button class="minimize-btn" (click)="minimizeChat()" [style.color]="settings.backgroundColor">
           ✕
-        </button>
+        </button> -->
       </div>
       
       <div class="chat-messages" #messagesContainer>
@@ -408,12 +409,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
   
   openAdminPanel(): void {
-    const password = prompt('הזן סיסמת מנהל:');
-    if (password === 'admin123') {
+    // const password = prompt('הזן סיסמת מנהל:');
+    // if (password === 'admin123') {
       this.adminPanel.openAdmin();
-      this.adminPanel.isAuthenticated = true;
-    } else if (password !== null) {
-      alert('סיסמה שגויה');
-    }
+      this.adminPanel.isAuthenticated = false;
+    // } else if (password !== null) {
+    //   alert('סיסמה שגויה');
+    // }
   }
 }
