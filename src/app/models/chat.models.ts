@@ -33,6 +33,9 @@ export interface ChatSettings {
   productLabel: string;
   adminaName: string;
   adminPhone: string;
+  showCredit: boolean;
+  creditText: string;
+  creditUrl: string;
 }
 
 export interface LeadData {

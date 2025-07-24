@@ -184,6 +184,31 @@ import { SettingsService } from '../../services/settings.service';
             </div>
           </div>
           
+          <div class="credit-section">
+            <h3>הגדרות קרדיט</h3>
+            
+            <div class="setting-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="settings.showCredit" class="setting-checkbox">
+                הצג קרדיט
+              </label>
+            </div>
+            
+            <div class="setting-group">
+              <label>טקסט הקרדיט:</label>
+              <input type="text" [(ngModel)]="settings.creditText" class="setting-input"
+                     [disabled]="!settings.showCredit"
+                     placeholder="Powered by ChatBot Builder">
+            </div>
+            
+            <div class="setting-group">
+              <label>קישור הקרדיט:</label>
+              <input type="url" [(ngModel)]="settings.creditUrl" class="setting-input"
+                     [disabled]="!settings.showCredit"
+                     placeholder="https://example.com">
+            </div>
+          </div>
+          
           <div class="embed-section">
             <h3>קוד הטמעה</h3>
             <textarea readonly [value]="generateEmbedCode()" class="embed-code" #embedTextarea></textarea>
@@ -312,40 +337,99 @@ export class AdminComponent implements OnInit {
   const chatFrame = document.createElement('iframe');
   chatFrame.src = '${baseUrl}';
   chatFrame.style.cssText = \`
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
     width: 400px;
     height: 600px;
     border: none;
     border-radius: 8px;
     background: white;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
   \`;
   
   // Mobile responsive
   if (window.innerWidth <= 768) {
+    chatFrame.style.position = 'fixed';
+    chatFrame.style.top = '0';
+    chatFrame.style.left = '0';
+    chatFrame.style.right = '0';
+    chatFrame.style.bottom = '0';
+    chatFrame.style.transform = 'none';
     chatFrame.style.width = '100%';
     chatFrame.style.height = '100%';
     chatFrame.style.borderRadius = '0';
   }
   
+  // Position chat frame directly without overlay background on desktop
+  const showChat = function() {
+    if (window.innerWidth <= 768) {
+      // Mobile: use overlay
+      chatOverlay.style.display = 'block';
+    } else {
+      // Desktop: show frame directly
+      chatFrame.style.display = 'block';
+      document.body.appendChild(chatFrame);
+    }
+  };
+  
+  const hideChat = function() {
+    if (window.innerWidth <= 768) {
+      // Mobile: hide overlay
+      chatOverlay.style.display = 'none';
+    } else {
+      // Desktop: hide frame directly
+      chatFrame.style.display = 'none';
+      if (chatFrame.parentNode) {
+        chatFrame.parentNode.removeChild(chatFrame);
+      }
+    }
+  };
+  
+  // Initially hide the chat frame
+  chatFrame.style.display = 'none';
+  
   chatOverlay.appendChild(chatFrame);
   
   chatIcon.addEventListener('click', function() {
-    chatOverlay.style.display = 'block';
+    showChat();
   });
   
   chatOverlay.addEventListener('click', function(e) {
     if (e.target === chatOverlay) {
-      chatOverlay.style.display = 'none';
+      hideChat();
     }
   });
   
   // Listen for close messages from the chat iframe
   window.addEventListener('message', function(event) {
     if (event.data && event.data.type === 'closeChat') {
-      chatOverlay.style.display = 'none';
+      hideChat();
+    }
+  });
+  
+  // Handle window resize
+  window.addEventListener('resize', function() {
+    if (window.innerWidth <= 768) {
+      chatFrame.style.position = 'fixed';
+      chatFrame.style.top = '0';
+      chatFrame.style.left = '0';
+      chatFrame.style.right = '0';
+      chatFrame.style.bottom = '0';
+      chatFrame.style.transform = 'none';
+      chatFrame.style.width = '100%';
+      chatFrame.style.height = '100%';
+      chatFrame.style.borderRadius = '0';
+    } else {
+      chatFrame.style.position = 'fixed';
+      chatFrame.style.bottom = '90px';
+      chatFrame.style.right = '20px';
+      chatFrame.style.top = 'auto';
+      chatFrame.style.left = 'auto';
+      chatFrame.style.transform = 'none';
+      chatFrame.style.width = '400px';
+      chatFrame.style.height = '600px';
+      chatFrame.style.borderRadius = '8px';
     }
   });
   

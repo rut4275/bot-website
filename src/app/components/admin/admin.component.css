@@ -92,7 +92,8 @@
 
 .settings-section,
 .design-section,
-.embed-section {
+.embed-section,
+.credit-section {
   margin-bottom: 30px;
   padding: 20px;
   background-color: #f9fafb;
@@ -101,7 +102,8 @@
 
 .settings-section h3,
 .design-section h3,
-.embed-section h3 {
+.embed-section h3,
+.credit-section h3 {
   margin-top: 0;
   margin-bottom: 20px;
   color: #1f2937;

@@ -34,7 +34,10 @@ export class SettingsService {
     phoneLabel: "אשמח גם למספר הטלפון שלך, כדי שנוכל לחזור אליך אם נצטרך 📞",
     productLabel: "באיזה מוצר או שירות שלנו אתה הכי מתעניין? 📦",
     adminaName: "רות סהר מנהלת",
-    adminPhone: "0534193391"
+    adminPhone: "0534193391",
+    showCredit: true,
+    creditText: "Powered by ChatBot Builder",
+    creditUrl: "https://example.com"
   };
 
   private settingsSubject = new BehaviorSubject<ChatSettings>(this.DEFAULT_SETTINGS);

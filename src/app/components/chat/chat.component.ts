@@ -59,7 +59,8 @@ import { AdminComponent } from '../admin/admin.component';
           </div> -->
         </div>
       </div>
-      
+
+      <div class="chat-input-credit">
       <div class="chat-input">
         <input type="text" 
                [(ngModel)]="currentMessage" 
@@ -76,7 +77,15 @@ import { AdminComponent } from '../admin/admin.component';
           <span *ngIf="!isLoading">➤</span>
           <div *ngIf="isLoading" class="loading-spinner"></div>
         </button>
+        </div>
+        <div *ngIf="settings.showCredit" class="chat-credit">
+        <a [href]="settings.creditUrl" target="_blank" rel="noopener noreferrer">
+          {{ settings.creditText }}
+        </a>
       </div>
+      </div>
+      
+      
       
       <app-admin></app-admin>
     </div>
