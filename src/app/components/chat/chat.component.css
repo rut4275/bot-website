@@ -261,9 +261,21 @@
   
   .chat-messages {
     padding: 12px;
+    padding-bottom: 100px; /* Increased padding for mobile */
   }
   
   .chat-input {
     padding: 12px;
+    height: 72px; /* Fixed height for mobile */
+  }
+  
+  .message-input {
+    height: 48px; /* Ensure consistent input height */
+  }
+  
+  .send-button {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0; /* Prevent button from shrinking */
   }
 }
