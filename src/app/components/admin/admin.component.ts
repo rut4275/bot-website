@@ -13,6 +13,10 @@ import { SettingsService } from '../../services/settings.service';
       <div class="admin-panel" (click)="$event.stopPropagation()">
         <div class="admin-header">
           <h2>פאנל ניהול</h2>
+          <div *ngIf="isAuthenticated" class="actions">
+            <button (click)="saveSettings()" class="save-btn">שמור הגדרות</button>
+            <button (click)="resetSettings()" class="reset-btn">אפס הגדרות</button>
+          </div>
           <button class="close-btn" (click)="closeAdmin()">✕</button>
         </div>
         
@@ -215,10 +219,7 @@ import { SettingsService } from '../../services/settings.service';
             <button (click)="copyEmbedCode(embedTextarea)" class="copy-btn">העתק קוד</button>
           </div>
           
-          <div class="actions">
-            <button (click)="saveSettings()" class="save-btn">שמור הגדרות</button>
-            <button (click)="resetSettings()" class="reset-btn">אפס הגדרות</button>
-          </div>
+          
         </div>
       </div>
     </div>
