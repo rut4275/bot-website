@@ -16,8 +16,8 @@ import { SettingsService } from '../../services/settings.service';
           <div *ngIf="isAuthenticated" class="actions">
             <button (click)="saveSettings()" class="save-btn">שמור הגדרות</button>
             <button (click)="resetSettings()" class="reset-btn">אפס הגדרות</button>
-          </div>
-          <button class="close-btn" (click)="closeAdmin()">✕</button>
+            <button class="close-btn" (click)="closeAdmin()">✕</button>
+         </div>
         </div>
         
         <div *ngIf="!isAuthenticated" class="auth-section">
@@ -115,7 +115,7 @@ import { SettingsService } from '../../services/settings.service';
             <div class="setting-group">
               <label>
                 <input type="checkbox" [(ngModel)]="settings.collectPhone" class="setting-checkbox">
-                איסוף טלפון
+                איסוף טלפון השתמש ב"#1" לשימוש בשם שנקלט
               </label>
               <input type="text" [(ngModel)]="settings.phoneLabel" class="setting-input"
                      [disabled]="!settings.collectPhone"
@@ -125,7 +125,7 @@ import { SettingsService } from '../../services/settings.service';
             <div class="setting-group">
               <label>
                 <input type="checkbox" [(ngModel)]="settings.collectProduct" class="setting-checkbox">
-                איסוף מוצר
+                איסוף מוצר השתמש ב"#1" לשימוש בשם שנקלט
               </label>
               <input type="text" [(ngModel)]="settings.productLabel" class="setting-input"
                      [disabled]="!settings.collectProduct"

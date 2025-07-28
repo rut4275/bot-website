@@ -178,13 +178,13 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     // Determine first step based on settings
     if (this.settings.collectName) {
       this.currentStep = 'collect-name';
-      this.addBotMessage(this.settings.nameLabel || 'הי! נשמח להכיר אותך!\n מה השם שלך?');
+      this.addBotMessage(this.settings.nameLabel.replace(/#1/g, "") || 'הי! נשמח להכיר אותך!\n מה השם שלך?');
     } else if (this.settings.collectPhone) {
       this.currentStep = 'collect-phone';
-      this.addBotMessage(this.settings.phoneLabel || 'הי! נשמח להכיר אותך!\nמה מספר הטלפון שלך?');
+      this.addBotMessage(this.settings.phoneLabel.replace(/#1/g, this.leadData.name) || 'הי! נשמח להכיר אותך!\nמה מספר הטלפון שלך?');
     } else if (this.settings.collectProduct) {
       this.currentStep = 'collect-product';
-      this.addBotMessage(this.settings.productLabel || 'הי! נשמח להכיר אותך!\nאיזה מוצר מעניין אותך?');
+      this.addBotMessage(this.settings.productLabel.replace(/#1/g, this.leadData.name) || 'הי! נשמח להכיר אותך!\nאיזה מוצר מעניין אותך?');
       this.showProductButtons = true;
       this.addBotMessage('בחר מוצר כדי להמשיך:');
     } else {
@@ -212,10 +212,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     
     if (this.settings.collectPhone) {
       this.currentStep = 'collect-phone';
-      this.addBotMessage(this.settings.phoneLabel || 'מעולה! מה מספר הטלפון שלך?');
+      this.addBotMessage(this.settings.phoneLabel.replace(/#1/g, this.leadData.name)|| 'מעולה! מה מספר הטלפון שלך?');
     }else if (this.settings.collectProduct) {
       this.currentStep = 'collect-product';
-      this.addBotMessage(this.settings.productLabel || 'מעולה! איזה מוצר מעניין אותך?');
+      this.addBotMessage(this.settings.productLabel.replace(/#1/g, this.leadData.name) || 'מעולה! איזה מוצר מעניין אותך?');
       this.showProductButtons = true;
       this.addBotMessage('בחר מוצר כדי להמשיך:');
     } else {
@@ -231,7 +231,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     
     if (this.settings.collectProduct) {
       this.currentStep = 'collect-product';
-      this.addBotMessage(this.settings.productLabel || 'מעולה! איזה מוצר מעניין אותך?',this.settings.products);
+      this.addBotMessage(this.settings.productLabel.replace(/#1/g, this.leadData.name) || 'מעולה! איזה מוצר מעניין אותך?',this.settings.products);
       this.showProductButtons = true;
       this.addBotMessage('בחר מוצר כדי להמשיך:');
     } else {
