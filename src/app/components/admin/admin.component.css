@@ -269,3 +269,26 @@
     flex-direction: column;
   }
 }
+.collection-section {
+  padding: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.setting-group {
+  margin-bottom: 1rem;
+}
+
+.setting-input, .setting-textarea, .setting-select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.setting-textarea {
+  min-height: 60px;
+  resize: vertical;
+}

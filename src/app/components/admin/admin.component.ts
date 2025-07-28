@@ -100,7 +100,7 @@ import { SettingsService } from '../../services/settings.service';
           </div>
           
           <div class="collection-section">
-            <h3>הגדרות איסוף נתונים</h3>
+           <!-- <h3>הגדרות איסוף נתונים</h3>
             
             <div class="setting-group">
               <label>
@@ -138,7 +138,40 @@ import { SettingsService } from '../../services/settings.service';
                         (ngModelChange)="updateProducts()"
                         class="setting-textarea"
                         placeholder="מוצר 1&#10;מוצר 2&#10;מוצר 3"></textarea>
-            </div>
+            </div> -->
+            <div class="collection-section">
+  <h3>הגדרות איסוף נתונים</h3>
+
+  <div class="setting-group" *ngFor="let question of settings.questions; let i = index">
+    <label>שאלה {{ i + 1 }}:</label>
+    <select [(ngModel)]="question.type" class="setting-select">
+      <option value="text">שאלה פתוחה (טקסט)</option>
+      <option value="buttons">שאלה עם כפתורים</option>
+      <option value="card">כרטיס מידע</option>
+    </select>
+
+    <input type="text" [(ngModel)]="question.label" class="setting-input"
+           placeholder="תוכן השאלה / כותרת הכרטיס">
+
+    <div *ngIf="question.type === 'buttons'" class="setting-group">
+      <label>כפתורים (כפתור בכל שורה):</label>
+      <textarea [(ngModel)]="question.buttonsText"
+                (ngModelChange)="updateQuestionButtons(i)"
+                class="setting-textarea"
+                placeholder="כפתור 1&#10;כפתור 2"></textarea>
+    </div>
+
+    <div *ngIf="question.type === 'card'" class="setting-group">
+      <label>תיאור הכרטיס:</label>
+      <textarea [(ngModel)]="question.description" class="setting-textarea"
+                placeholder="תיאור הכרטיס"></textarea>
+      <label>תמונה (קישור):</label>
+      <input type="text" [(ngModel)]="question.imageUrl" class="setting-input"
+             placeholder="https://example.com/image.jpg">
+    </div>
+  </div>
+</div>
+
           </div>
           
           <div class="design-section">
@@ -233,7 +266,7 @@ export class AdminComponent implements OnInit {
   settings: ChatSettings = {} as ChatSettings;
   productsText: string = '';
   
-  private readonly ADMIN_PASSWORD = 'admin123';
+  private readonly ADMIN_PASSWORD = '123';
 
   constructor(private settingsService: SettingsService) {}
 
@@ -244,6 +277,10 @@ export class AdminComponent implements OnInit {
         this.productsText = this.settings.products ? this.settings.products.join('\n') : '';
       }
     });
+  }
+  updateQuestionButtons(index: number): void {
+    const text = this.settings.questions[index].buttonsText || '';
+    this.settings.questions[index].buttons = text.split('\n').filter(b => b.trim() !== '');
   }
 
   updateProducts(): void {

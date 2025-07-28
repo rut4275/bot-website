@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked }
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { ChatMessage, ChatSettings, ChatStep } from '../../models/chat.models';
+import { ChatMessage, ChatSettings, ChatStep, MessageType } from '../../models/chat.models';
 import { SettingsService } from '../../services/settings.service';
 import { ApiService } from '../../services/api.service';
 import { AdminComponent } from '../admin/admin.component';
@@ -20,46 +20,66 @@ import { AdminComponent } from '../admin/admin.component';
         <button class="minimize-btn" (click)="minimizeChat()" [style.color]="settings.backgroundColor">
           ✕
         </button> -->
-      </div>
-      
+         </div>
       <div class="chat-messages" #messagesContainer>
-        <div *ngFor="let message of messages" class="message-wrapper">
-          <div class="message" 
-               [class.user-message]="message.isUser"
-               [class.bot-message]="!message.isUser"
-               [style.background-color]="message.isUser ? settings.primaryColor : '#f3f4f6'"
-               [style.color]="message.isUser ? settings.backgroundColor : settings.textColor">
-            <div class="message-content">{{ message.text }}</div>
-            <div *ngIf="message.buttons && message.buttons.length > 0" class="product-buttons">
-              <button *ngFor="let button1 of message.buttons" 
-                      (click)="selectProduct(button1)"
-                      [style.background-color]="settings.secondaryColor"
-                      [style.color]="settings.textColor"
-                      class="product-button">
-                {{ button1 }}
-              </button>
-            </div>
-            <div class="message-time">{{ formatTime(message.timestamp) }}</div>
-            <div *ngIf="message.status === 'sending'" class="sending-indicator">
-              <div class="dots">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Product selection buttons -->
-          <!-- <div *ngIf="showProductButtons && message === messages[messages.length - 1] && !message.isUser" 
-               class="product-buttons">
-            <button *ngFor="let product of settings.products" 
-                    (click)="selectProduct(product)"
-                    class="product-button">
-              {{ product }}
-            </button>
-          </div> -->
+       <div *ngFor="let message of messages" class="message-wrapper">
+        <div class="message" 
+        [class.user-message]="message.isUser"
+        [class.bot-message]="!message.isUser"
+        [style.background-color]="message.isUser ? settings.primaryColor : '#f3f4f6'"
+        [style.color]="message.isUser ? settings.backgroundColor : settings.textColor">
+
+     <!-- הודעת טקסט רגילה -->
+     <div *ngIf="message.type === 'text'">
+       <div class="message-content">{{ message.text }}</div>
+     </div>
+
+     <!-- הודעה עם כפתורים -->
+     <div *ngIf="message.type === 'buttons' && message.buttons && message.buttons.length > 0" class="product-buttons">
+       <div class="message-content">{{ message.text }}</div>
+       <button *ngFor="let btn of message.buttons" 
+               (click)="selectedButton(btn)"
+               [style.background-color]="settings.secondaryColor"
+               [style.color]="settings.textColor"
+               class="product-button">
+         {{ btn }}
+       </button>
+     </div>
+
+     <!-- הודעה עם תמונה -->
+     <div *ngIf="message.type === 'image' && message.imageUrl">
+       <img [src]="message.imageUrl" alt="Image" class="message-image">
+       <div *ngIf="message.text" class="message-content">{{ message.text }}</div>
+     </div>
+
+     <!-- הודעת כרטיס (Card) -->
+     <div *ngIf="message.type === 'card' && message.card" class="message-card">
+       <img *ngIf="message.card.imageUrl" [src]="message.card.imageUrl" alt="Card image" class="card-image">
+          <div class="card-title">{{ message.card.title }}</div>
+          <div *ngIf="message.card.description" class="card-description">{{ message.card.description }}</div>
+          <a *ngIf="message.card.buttonText && message.card.buttonUrl"
+             [href]="message.card.buttonUrl"
+             target="_blank"
+             class="card-button">
+             {{ message.card.buttonText }}
+          </a>
         </div>
+
+        <!-- אינדיקציה לשליחה -->
+        <div *ngIf="message.status === 'sending'" class="sending-indicator">
+          <div class="dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+
+        <!-- זמן ההודעה -->
+        <div class="message-time">{{ formatTime(message.timestamp) }}</div>
       </div>
+       </div>
+        </div>
+
 
       <div class="chat-input-credit">
       <div class="chat-input">
@@ -104,12 +124,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   conversationEnded = false;
   waitingForResponse = false;
   showProductButtons = false;
-  currentStep: ChatStep = 'collect-name';
+  currentStep: ChatStep = 'collect-details';
+  initialQuestionsIndex: number = 0;
   private conversationId: string = '';
   leadData: any = {
-    name: '',
-    phone: '',
-    product: '',
+    initialAnswers: [],
     questions: []
   };
   threadId: string = '';
@@ -131,16 +150,32 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       minute: '2-digit' 
     });
   }
-
-  addBotMessage(text: string, products?: string[]): void {
+  
+  addBotMessage(message_type:MessageType,text?: string,buttons?: string[],imageUrl?: string,
+    card_title?: string,card_description?: string,card_imageUrl?: string,
+    card_buttonText?: string,card_buttonUrl?: string): void {
     const botMessage: ChatMessage = {
       id: Date.now().toString(),
       text: text,
       isUser: false,
       timestamp: new Date(),
       status: 'sent',
-      buttons: products ? products.map(product => product) : undefined
+      buttons: (message_type==='buttons'&&buttons) ? buttons.map(button => button) : undefined,
+      type: message_type,
+      imageUrl: imageUrl,
+      card: message_type === 'card' ? { 
+        title: card_title || '',
+        description: card_description || '',
+        imageUrl: card_imageUrl || '',
+        buttonText: card_buttonText || '',
+        buttonUrl: card_buttonUrl || ''
+      } : undefined
     };
+    if (message_type === 'buttons' && buttons) {
+      this.showProductButtons = true;
+    }else {
+      this.showProductButtons = false;  
+    }
     this.messages.push(botMessage);
     this.shouldScrollToBottom = true;
   }
@@ -176,21 +211,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   initializeChat(): void {
     // Determine first step based on settings
-    if (this.settings.collectName) {
-      this.currentStep = 'collect-name';
-      this.addBotMessage(this.settings.nameLabel.replace(/#1/g, "") || 'הי! נשמח להכיר אותך!\n מה השם שלך?');
-    } else if (this.settings.collectPhone) {
-      this.currentStep = 'collect-phone';
-      this.addBotMessage(this.settings.phoneLabel.replace(/#1/g, this.leadData.name) || 'הי! נשמח להכיר אותך!\nמה מספר הטלפון שלך?');
-    } else if (this.settings.collectProduct) {
-      this.currentStep = 'collect-product';
-      this.addBotMessage(this.settings.productLabel.replace(/#1/g, this.leadData.name) || 'הי! נשמח להכיר אותך!\nאיזה מוצר מעניין אותך?');
-      this.showProductButtons = true;
-      this.addBotMessage('בחר מוצר כדי להמשיך:');
-    } else {
-      this.currentStep = 'ask-question';
-      this.addBotMessage('הי! איך אפשר לעזור לך היום?');
-    }
+    this.handleDetailQuestion();
   }
 
   private updateCSSVariables(): void {
@@ -204,63 +225,49 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   isFormStep(): boolean {
-    return ['collect-name', 'collect-phone', 'collect-product'].includes(this.currentStep);
+    return ['collect-details'].includes(this.currentStep);
   }
 
-  handleNameSubmit(): void {
-    if (!this.leadData.name.trim()) return;
-    
-    if (this.settings.collectPhone) {
-      this.currentStep = 'collect-phone';
-      this.addBotMessage(this.settings.phoneLabel.replace(/#1/g, this.leadData.name)|| 'מעולה! מה מספר הטלפון שלך?');
-    }else if (this.settings.collectProduct) {
-      this.currentStep = 'collect-product';
-      this.addBotMessage(this.settings.productLabel.replace(/#1/g, this.leadData.name) || 'מעולה! איזה מוצר מעניין אותך?');
-      this.showProductButtons = true;
-      this.addBotMessage('בחר מוצר כדי להמשיך:');
-    } else {
-      this.currentStep = 'ask-question';
-      this.addBotMessage('מעולה! מה היית רוצה לדעת או לשאול בהתחלה? 💬');
+  handleDetailQuestion(): void {
+    if(this.initialQuestionsIndex < this.settings.questions.length) {
+      let i = this.initialQuestionsIndex;
+      this.currentStep = 'collect-details';
+      this.addBotMessage(this.settings.questions[i].type,
+        this.settings.questions[i].label.replace(/#1/g, i>0 ?this.leadData.initialAnswers[0]:""),
+        this.settings.questions[i].buttons);
+      this.shouldScrollToBottom = true;
     }
-    this.currentMessage = '';
-    this.shouldScrollToBottom = true;
-  }
-
-  handlePhoneSubmit(): void {
-    if (!this.leadData.phone.trim()) return;
-    
-    if (this.settings.collectProduct) {
-      this.currentStep = 'collect-product';
-      this.addBotMessage(this.settings.productLabel.replace(/#1/g, this.leadData.name) || 'מעולה! איזה מוצר מעניין אותך?',this.settings.products);
-      this.showProductButtons = true;
-      this.addBotMessage('בחר מוצר כדי להמשיך:');
-    } else {
+    if(this.initialQuestionsIndex===this.settings.questions.length) { 
       this.currentStep = 'ask-question';
-      this.addBotMessage('מה תרצה לדעת?');
+      this.addBotMessage('text','מעולה! מה היית רוצה לדעת או לשאול בהתחלה? 💬');
+      this.shouldScrollToBottom = true;
     }
-    this.shouldScrollToBottom = true;
   }
 
-  handleProductSubmit(): void {
-    if (!this.leadData.product) return;
-    
-    this.currentStep = 'ask-question';
-    this.addBotMessage('מעולה! מה היית רוצה לדעת או לשאול בהתחלה? 💬');
-    this.shouldScrollToBottom = true;
+  handleDetailSubmit(): void {
+    // if (!this.leadData.initialAnswers[].trim()) return;
+    if(this.initialQuestionsIndex < this.settings.questions.length) {
+      let i = this.initialQuestionsIndex;
+      this.currentStep = 'collect-details';
+      this.leadData.initialAnswers.push(this.currentMessage.trim());
+      this.currentMessage = '';
+      this.shouldScrollToBottom = true;
+      this.initialQuestionsIndex++;
+      this.handleDetailQuestion();
+    }
+    if(this.initialQuestionsIndex===this.settings.questions.length) { 
+      this.currentStep = 'ask-question';
+    }
   }
 
-  selectProduct(product: string): void {
+  selectedButton(product: string): void {
     this.currentMessage = product;
     this.sendMessage();
     this.showProductButtons = false;
   }
 
   startChatFlow(): void {
-    this.initializeChat();
-    // this.handleNameSubmit();
-    // this.handlePhoneSubmit();
-    // this.handleProductSubmit();
-    
+    this.initializeChat();    
   }
 
   sendMessage(): void {
@@ -273,24 +280,18 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         text: this.currentMessage,
         isUser: true,
         timestamp: new Date(),
-        status: 'sent'
+        status: 'sent',
+        type: 'text'
       };
 
       this.messages.push(userMessage);
       this.shouldScrollToBottom = true;
-      if (this.currentStep === 'collect-name') {
-        this.leadData.name = this.currentMessage.trim();
-        this.handleNameSubmit();
-      } else if (this.currentStep === 'collect-phone') {
-        this.leadData.phone = this.currentMessage.trim();
-        if(this.leadData.phone === this.settings.adminPhone && this.leadData.name === this.settings.adminaName) {
+      if (this.currentStep === 'collect-details') {
+        if(this.initialQuestionsIndex==1 && this.currentMessage === this.settings.adminPhone && this.leadData.initialAnswers[0] === this.settings.adminName) {
           this.openAdminPanel();
           return;
         }
-        this.handlePhoneSubmit();
-      } else if (this.currentStep === 'collect-product') {
-        this.leadData.product = this.currentMessage.trim();
-        this.handleProductSubmit();
+        this.handleDetailSubmit();
       }
       this.currentMessage = '';
       return;
@@ -301,7 +302,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       text: this.currentMessage,
       isUser: true,
       timestamp: new Date(),
-      status: 'sent'
+      status: 'sent',
+      type: 'text'
     };
 
     this.messages.push(userMessage);
@@ -320,7 +322,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       text: '',
       isUser: false,
       timestamp: new Date(),
-      status: 'sending'
+      status: 'sending',
+      type: 'text'
     };
     this.messages.push(loadingMessage);
     this.shouldScrollToBottom = true;
@@ -333,7 +336,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.messages = this.messages.filter(msg => msg.id !== loadingMessage.id);
 
         this.threadId = response.threadId || this.threadId;
-        const answer = response.result || response.answer || response.message || 'מצטער, נראה שיש בעיה, אנא נסה שוב בעוד מספר דקות';
+        const answer = response.text || response.card.title || 'מצטער, נראה שיש בעיה, אנא נסה שוב בעוד מספר דקות';
         
         // Save question and answer
         this.leadData.questions.push({
@@ -342,7 +345,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
           timestamp: new Date()
         });
         
-        this.addBotMessage(answer);
+        this.addBotMessage(response.type || 'text',response.text, response.buttons, response.imageUrl,
+          response.card?.title, response.card?.description, response.card?.imageUrl);
         
       },
       error: (error) => {
@@ -367,13 +371,13 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.apiService.submitLeadToWebhook(leadDataWithConversation, this.settings.summaryWebhookUrl).subscribe({
       next: () => {
         this.isLoading = false;
-        this.addBotMessage('תודה שפנית אלינו! נחזור אליך בהקדם.');
+        this.addBotMessage('text','תודה שפנית אלינו! נחזור אליך בהקדם.');
         this.conversationEnded = true;
         this.currentStep = 'completed';
       },
       error: (error) => {
         this.isLoading = false;
-        this.addBotMessage('תודה שפנית אלינו! נחזור אליך בהקדם.');
+        this.addBotMessage('text','תודה שפנית אלינו! נחזור אליך בהקדם.');
         this.conversationEnded = true;
         this.currentStep = 'completed';
       }

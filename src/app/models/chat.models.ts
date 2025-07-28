@@ -1,9 +1,18 @@
 export interface ChatMessage {
   id: string;
-  text: string;
+  type: MessageType; // סוג ההודעה
+  text?: string; // טקסט רגיל (לא חובה לכל סוג)
+  imageUrl?: string; // לתמונות
+  buttons?: string[]; // לכפתורים
+  card?: {
+    title: string;
+    description?: string;
+    imageUrl?: string;
+    buttonText?: string;
+    buttonUrl?: string;
+  };
   isUser: boolean;
   timestamp: Date;
-  buttons?: string[];
   status?: 'sending' | 'sent' | 'error';
 }
 
@@ -25,23 +34,22 @@ export interface ChatSettings {
   chatIcon: string;
   botName: string;
   userPlaceholder: string;
-  collectName: boolean;
-  collectPhone: boolean;
-  collectProduct: boolean;
-  nameLabel: string;
-  phoneLabel: string;
-  productLabel: string;
-  adminaName: string;
+  // collectName: boolean;
+  // collectPhone: boolean;
+  // collectProduct: boolean;
+  // nameLabel: string;
+  // phoneLabel: string;
+  // productLabel: string;
+  adminName: string;
   adminPhone: string;
   showCredit: boolean;
   creditText: string;
   creditUrl: string;
+  questions: QuestionSetting[];
 }
 
 export interface LeadData {
-  name: string;
-  phone: string;
-  product: string;
+  initialAnswers: string[];
   questions: Array<{
     question: string;
     answer: string;
@@ -50,9 +58,7 @@ export interface LeadData {
 }
 
 export type ChatStep = 
-  | 'collect-name'
-  | 'collect-phone' 
-  | 'collect-product'
+  | 'collect-details'
   | 'ask-question'
   | 'completed';
 
@@ -60,8 +66,24 @@ export interface AdminConfig {
   password: string;
 }
 
+export type MessageType =
+  'text' | 'buttons' | 'image' | 'card';
+
+
+
 export interface WebhookResponse {
   "תשובה": string;
   "thread_Id_cmd_gen": string;
   "סיום שיחה": string;
 }
+
+// settings.model.ts או בקומפוננטה
+export interface QuestionSetting {
+  type: 'text' | 'buttons' | 'card';
+  label: string;
+  buttons?: string[];
+  buttonsText?: string; // שדה עזר לעבודה עם textarea
+  description?: string;
+  imageUrl?: string;
+}
+

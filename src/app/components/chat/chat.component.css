@@ -247,6 +247,121 @@
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+/* סגנון כללי להודעות */
+.message {
+  margin: 8px 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  max-width: 80%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  word-wrap: break-word;
+}
+
+/* הודעות משתמש לעומת הודעות בוט */
+.user-message {
+  align-self: flex-end;
+}
+.bot-message {
+  align-self: flex-start;
+}
+
+/* תוכן טקסט רגיל */
+.message-content {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* אינדיקציה לשליחה */
+.sending-indicator .dots span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 1px;
+  background-color: #bbb;
+  border-radius: 50%;
+  animation: blink 1.4s infinite both;
+}
+.sending-indicator .dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.sending-indicator .dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+/* כפתורים */
+.product-buttons {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+.product-button {
+  margin: 4px 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s;
+}
+.product-button:hover {
+  filter: brightness(0.95);
+}
+
+/* תמונה */
+.message-image {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 6px;
+}
+
+/* כרטיס */
+.message-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 8px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+}
+.card-image {
+  width: 100%;
+  display: block;
+}
+.card-title {
+  font-weight: bold;
+  padding: 8px 12px 4px;
+  font-size: 14px;
+}
+.card-description {
+  padding: 0 12px 8px;
+  font-size: 13px;
+  color: #555;
+}
+.card-button {
+  display: block;
+  text-align: center;
+  margin: 8px 12px 12px;
+  padding: 6px 10px;
+  background-color: #3b82f6; /* כחול ברירת מחדל */
+  color: #fff;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.card-button:hover {
+  background-color: #2563eb;
+}
+
+/* זמן ההודעה */
+.message-time {
+  font-size: 10px;
+  color: #999;
+  margin-top: 4px;
+  text-align: right;
+}
 
 @keyframes fadeIn {
   from {
@@ -317,5 +432,47 @@
     width: 48px;
     height: 48px;
     flex-shrink: 0; /* Prevent button from shrinking */
+  }
+}
+
+@media (max-width: 600px) {
+  .message {
+    max-width: 100%;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .product-button {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .message-card {
+    margin-top: 6px;
+  }
+
+  .card-title {
+    font-size: 13px;
+    padding: 6px 10px 4px;
+  }
+
+  .card-description {
+    font-size: 12px;
+    padding: 0 10px 6px;
+  }
+
+  .card-button {
+    font-size: 12px;
+    margin: 6px 10px 10px;
+    padding: 5px 8px;
+  }
+
+  .message-time {
+    font-size: 9px;
+  }
+
+  .sending-indicator .dots span {
+    width: 5px;
+    height: 5px;
   }
 }

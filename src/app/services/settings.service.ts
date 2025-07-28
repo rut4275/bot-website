@@ -27,17 +27,21 @@ export class SettingsService {
     chatIcon: "💬",
     botName: "Assistant",
     userPlaceholder: "Type a message...",
-    collectName: true,
-    collectPhone: true,
-    collectProduct: true,
-    nameLabel: "היי! נעים להכיר 😊 איך קוראים לך?",
-    phoneLabel: "אשמח גם למספר הטלפון שלך, כדי שנוכל לחזור אליך אם נצטרך 📞",
-    productLabel: "באיזה מוצר או שירות שלנו אתה הכי מתעניין? 📦",
-    adminaName: "רות סהר מנהלת",
+    // collectName: true,
+    // collectPhone: true,
+    // collectProduct: true,
+    // nameLabel: "היי! נעים להכיר 😊 איך קוראים לך?",
+    // phoneLabel: "אשמח גם למספר הטלפון שלך, כדי שנוכל לחזור אליך אם נצטרך 📞",
+    // productLabel: "באיזה מוצר או שירות שלנו אתה הכי מתעניין? 📦",
+    adminName: "רות סהר מנהלת",
     adminPhone: "0534193391",
     showCredit: true,
     creditText: "Powered by ChatBot Builder",
-    creditUrl: "https://example.com"
+    creditUrl: "https://example.com",
+    questions: [
+      { type: 'text', label: 'היי! נעים להכיר 😊 איך קוראים לך?'},
+      { type: 'text', label: 'אשמח גם למספר הטלפון שלך, כדי שנוכל לחזור אליך אם נצטרך 📞' },
+      { type: 'buttons', label: 'באיזה מוצר או שירות שלנו אתה הכי מתעניין? 📦', buttons: ['אוטומציה','צאטבוט','מערכות ניהול'], buttonsText: '' }]
   };
 
   private settingsSubject = new BehaviorSubject<ChatSettings>(this.DEFAULT_SETTINGS);
