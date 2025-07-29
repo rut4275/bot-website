@@ -476,3 +476,42 @@
     height: 5px;
   }
 }
+.send-button ,.mic-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+.chat-input-with-mic {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.message-input {
+  width: 100%;
+  padding-right: 36px;  /* // מקום לאייקון מימין */
+  padding-left: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  height: 36px;
+} 
+
+.mic-inside {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #333;
+}

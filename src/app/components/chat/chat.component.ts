@@ -82,22 +82,31 @@ import { AdminComponent } from '../admin/admin.component';
 
 
       <div class="chat-input-credit">
-      <div class="chat-input">
-        <input type="text" 
-               [(ngModel)]="currentMessage" 
-               (keyup.enter)="sendMessage()"
-               [placeholder]="settings.userPlaceholder"
-               [disabled]="isLoading || showProductButtons || conversationEnded || waitingForResponse"
-               [style.font-family]="settings.fontFamily"
-               [style.font-size]="settings.fontSize"
-               class="message-input">
-        <button (click)="sendMessage()" 
-                [disabled]="isLoading || !currentMessage.trim() || conversationEnded || showProductButtons"
-                [style.background-color]="settings.primaryColor"
-                class="send-button">
-          <span *ngIf="!isLoading">➤</span>
-          <div *ngIf="isLoading" class="loading-spinner"></div>
-        </button>
+        <div class="chat-input">
+          <div class="chat-input-with-mic">
+            <input type="text" 
+                   [(ngModel)]="currentMessage" 
+                   (keyup.enter)="sendMessage()"
+                   [placeholder]="settings.userPlaceholder"
+                   [disabled]="isLoading || showProductButtons || conversationEnded || waitingForResponse"
+                   [style.font-family]="settings.fontFamily"
+                   [style.font-size]="settings.fontSize"
+                   class="message-input">
+            <button (click)="toggleRecording()"
+            [disabled]="isLoading || conversationEnded"
+            [style.background-color]="isRecording ? '#dc2626' : 'transparent'"
+            class="mic-inside">
+              🎤
+            </button>
+          </div>
+  
+          <button (click)="sendMessage()" 
+                  [disabled]="isLoading || !currentMessage.trim() || conversationEnded || showProductButtons"
+                  [style.background-color]="settings.primaryColor"
+                  class="send-button">
+            <span *ngIf="!isLoading">➤</span>
+            <div *ngIf="isLoading" class="loading-spinner"></div>
+          </button>
         </div>
         <div *ngIf="settings.showCredit" class="chat-credit">
         <a [href]="settings.creditUrl" target="_blank" rel="noopener noreferrer">
@@ -132,6 +141,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     questions: []
   };
   threadId: string = '';
+  isRecording: boolean = false;
+  recognition: any;  // זה יהיה המנוע של זיהוי הדיבור
   
   private settingsSubscription?: Subscription;
   private shouldScrollToBottom = false;
@@ -223,6 +234,58 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     root.style.setProperty('--font-family', this.settings.fontFamily);
     root.style.setProperty('--font-size', this.settings.fontSize);
   }
+toggleRecording(): void {
+  if (this.isRecording) {
+    this.stopRecording();
+  } else {
+    this.startRecording();
+  }
+}
+
+startRecording(): void {
+  try {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('הדפדפן שלך לא תומך בזיהוי דיבור');
+      return;
+    }
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.lang = 'he-IL'; // עברית
+    this.recognition.interimResults = false;
+    this.recognition.maxAlternatives = 1;
+
+    this.recognition.onstart = () => {
+      this.isRecording = true;
+    };
+
+    this.recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      this.currentMessage = transcript; // שים את הטקסט בתיבת ההקלדה
+    };
+
+    this.recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      this.isRecording = false;
+    };
+
+    this.recognition.onend = () => {
+      this.isRecording = false;
+    };
+
+    this.recognition.start();
+  } catch (error) {
+    console.error('Failed to start recording', error);
+    this.isRecording = false;
+  }
+}
+
+stopRecording(): void {
+  if (this.recognition) {
+    this.recognition.stop();
+  }
+  this.isRecording = false;
+}
 
   isFormStep(): boolean {
     return ['collect-details'].includes(this.currentStep);
