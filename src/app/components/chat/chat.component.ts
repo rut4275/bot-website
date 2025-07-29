@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked }
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { ChatMessage, ChatSettings, ChatStep, MessageType } from '../../models/chat.models';
+import { ChatMessage, ChatSettings, ChatStep, MessageType,Answer,LeadData } from '../../models/chat.models';
 import { SettingsService } from '../../services/settings.service';
 import { ApiService } from '../../services/api.service';
 import { AdminComponent } from '../admin/admin.component';
@@ -127,7 +127,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   currentStep: ChatStep = 'collect-details';
   initialQuestionsIndex: number = 0;
   private conversationId: string = '';
-  leadData: any = {
+  leadData: LeadData = {
     initialAnswers: [],
     questions: []
   };
@@ -232,9 +232,18 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if(this.initialQuestionsIndex < this.settings.questions.length) {
       let i = this.initialQuestionsIndex;
       this.currentStep = 'collect-details';
+      const label = this.settings.questions[i].label.replace(/#([^\s#]+)/g, (match, key) => {
+         const found = this.leadData.initialAnswers.find(item => item.key === key);
+         return found ? found.value : match;
+      });
+
       this.addBotMessage(this.settings.questions[i].type,
-        this.settings.questions[i].label.replace(/#1/g, i>0 ?this.leadData.initialAnswers[0]:""),
-        this.settings.questions[i].buttons);
+        label,
+        this.settings.questions[i].buttons,
+        undefined,
+        this.settings.questions[i].label,
+        this.settings.questions[i].description,
+        this.settings.questions[i].imageUrl);
       this.shouldScrollToBottom = true;
     }
     if(this.initialQuestionsIndex===this.settings.questions.length) { 
@@ -249,7 +258,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if(this.initialQuestionsIndex < this.settings.questions.length) {
       let i = this.initialQuestionsIndex;
       this.currentStep = 'collect-details';
-      this.leadData.initialAnswers.push(this.currentMessage.trim());
+      // const answer = {key:this.settings.questions[i].key,value:this.currentMessage.trim()};
+      // this.leadData.initialAnswers.push(answer);
+      this.leadData.initialAnswers.push({key:this.settings.questions[i].key,value:this.currentMessage.trim()});
       this.currentMessage = '';
       this.shouldScrollToBottom = true;
       this.initialQuestionsIndex++;
@@ -287,7 +298,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.messages.push(userMessage);
       this.shouldScrollToBottom = true;
       if (this.currentStep === 'collect-details') {
-        if(this.initialQuestionsIndex==1 && this.currentMessage === this.settings.adminPhone && this.leadData.initialAnswers[0] === this.settings.adminName) {
+        if(this.initialQuestionsIndex==1 && this.currentMessage === this.settings.adminPhone && this.leadData.initialAnswers[0].value === this.settings.adminName) {
           this.openAdminPanel();
           return;
         }
@@ -391,9 +402,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.waitingForResponse = true;
     this.conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     this.leadData = {
-      name: '',
-      phone: '',
-      product: '',
+      initialAnswers: [],
       questions: []
     };
     

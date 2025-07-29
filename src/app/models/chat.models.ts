@@ -49,12 +49,18 @@ export interface ChatSettings {
 }
 
 export interface LeadData {
-  initialAnswers: string[];
-  questions: Array<{
-    question: string;
-    answer: string;
-    timestamp: Date;
-  }>;
+  initialAnswers: Answer[];
+  questions: Question[];
+}
+
+export interface Answer {
+  key?: string;
+  value: string;
+}
+export interface Question {
+   question: string;
+   answer: string;
+   timestamp: Date;
 }
 
 export type ChatStep = 
@@ -85,5 +91,6 @@ export interface QuestionSetting {
   buttonsText?: string; // שדה עזר לעבודה עם textarea
   description?: string;
   imageUrl?: string;
+  key?: string; // מפתח ייחודי לשימוש פנימי
 }
 

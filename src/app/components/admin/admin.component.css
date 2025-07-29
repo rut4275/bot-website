@@ -31,6 +31,8 @@
   background-color: #ebebeb;
   position: sticky;
   top: 0;
+  margin-bottom: 8px;
+  z-index: 10;
 }
 
 .admin-header h2 {
@@ -279,6 +281,16 @@
 .setting-group {
   margin-bottom: 1rem;
 }
+.setting-group-question {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  position: relative;
+}
+
 
 .setting-input, .setting-textarea, .setting-select {
   width: 100%;
@@ -291,4 +303,63 @@
 .setting-textarea {
   min-height: 60px;
   resize: vertical;
+}
+.message-item {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.drag-handle {
+  cursor: grab;
+  font-size: 18px;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  color: #999;
+  margin-bottom: 5px;
+  margin-right: 8px;
+}
+
+.setting-input, .setting-select {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.add-btn, .remove-btn {
+  background-color: #4CAF50;
+  color: white;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.remove-btn {
+  background-color: #e74c3c;
+  margin-top: 4px;
+}
+
+.add-btn {
+  margin-top: 8px;
+}
+.cdk-drag-preview {
+  transform: scale(0.5); /* מעט יותר קטן */
+  opacity: 0.9;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  border-radius: 8px;
+}
+.cdk-drag-placeholder {
+  opacity: 0.2;
+  border: 2px dashed #999;
+  border-radius: 8px;
+  background: transparent;
 }

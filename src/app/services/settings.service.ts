@@ -128,7 +128,7 @@ private loadFromLocalStorageOrDefault(): ChatSettings  {
   }
 
   private saveToWebhook(settings: ChatSettings, webhookUrl: string): Observable<any> {
-    return this.http.post(webhookUrl, settings).pipe(
+    return this.http.post(webhookUrl, {'settings': JSON.stringify(settings)}).pipe(
       timeout(10000),
       catchError(() => of({ message: 'Settings saved locally (webhook failed)' }))
     );

@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ChatSettings } from '../../models/chat.models';
 import { SettingsService } from '../../services/settings.service';
+import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule,DragDropModule],
   template: `
     <div class="admin-overlay" *ngIf="isVisible" (click)="closeAdmin()">
       <div class="admin-panel" (click)="$event.stopPropagation()">
@@ -100,79 +102,48 @@ import { SettingsService } from '../../services/settings.service';
           </div>
           
           <div class="collection-section">
-           <!-- <h3>הגדרות איסוף נתונים</h3>
-            
-            <div class="setting-group">
-              <label>
-                <input type="checkbox" [(ngModel)]="settings.collectName" class="setting-checkbox">
-                איסוף שם
-              </label>
-              <input type="text" [(ngModel)]="settings.nameLabel" class="setting-input"
-                     [disabled]="!settings.collectName"
-                     placeholder="מה השם שלך?">
+            <h3>הגדרות איסוף נתונים</h3>
+
+            <div cdkDropList  [cdkDropListData]="settings.questions" (cdkDropListDropped)="drop($event)">
+            <div class="setting-group-question" *ngFor="let question of settings.questions; let i = index" cdkDrag>
+              <div cdkDragHandle class="drag-handle">☰</div>
+                <h3>שאלה {{ i + 1 }}:</h3>
+                 <label>Message Key (חובה):</label>
+                 <input type="text" [(ngModel)]="question.key" required class="setting-input" placeholder="example: userName">
+
+                <select [(ngModel)]="question.type" class="setting-select">
+                  <option value="text">שאלה פתוחה (טקסט)</option>
+                  <option value="buttons">שאלה עם כפתורים</option>
+                  <option value="card">כרטיס מידע</option>
+                </select>
+
+                <input type="text" [(ngModel)]="question.label" class="setting-input"
+                       placeholder="תוכן השאלה / כותרת הכרטיס">
+
+                <div *ngIf="question.type === 'buttons'" class="setting-group">
+                  <label>כפתורים (כפתור בכל שורה):</label>
+                  <textarea [(ngModel)]="question.buttonsText"
+                            (ngModelChange)="updateQuestionButtons(i)"
+                            class="setting-textarea"
+                            placeholder="כפתור 1&#10;כפתור 2"></textarea>
+                </div>
+
+                <div *ngIf="question.type === 'card'" class="setting-group">
+                  <label>תיאור הכרטיס:</label>
+                  <textarea [(ngModel)]="question.description" class="setting-textarea"
+                            placeholder="תיאור הכרטיס"></textarea>
+                  <label>תמונה (קישור):</label>
+                  <input type="text" [(ngModel)]="question.imageUrl" class="setting-input"
+                         placeholder="https://example.com/image.jpg">
+                </div>
+
+                <button (click)="removeOpeningMessage(i)" class="remove-btn">הסר</button>
+
+              </div>
             </div>
-            
-            <div class="setting-group">
-              <label>
-                <input type="checkbox" [(ngModel)]="settings.collectPhone" class="setting-checkbox">
-                איסוף טלפון השתמש ב"#1" לשימוש בשם שנקלט
-              </label>
-              <input type="text" [(ngModel)]="settings.phoneLabel" class="setting-input"
-                     [disabled]="!settings.collectPhone"
-                     placeholder="מה מספר הטלפון שלך?">
-            </div>
-            
-            <div class="setting-group">
-              <label>
-                <input type="checkbox" [(ngModel)]="settings.collectProduct" class="setting-checkbox">
-                איסוף מוצר השתמש ב"#1" לשימוש בשם שנקלט
-              </label>
-              <input type="text" [(ngModel)]="settings.productLabel" class="setting-input"
-                     [disabled]="!settings.collectProduct"
-                     placeholder="איזה מוצר מעניין אותך?">
-            </div>
-            
-            <div class="setting-group">
-              <label>רשימת מוצרים (מוצר בכל שורה):</label>
-              <textarea [(ngModel)]="productsText" 
-                        (ngModelChange)="updateProducts()"
-                        class="setting-textarea"
-                        placeholder="מוצר 1&#10;מוצר 2&#10;מוצר 3"></textarea>
-            </div> -->
-            <div class="collection-section">
-  <h3>הגדרות איסוף נתונים</h3>
-
-  <div class="setting-group" *ngFor="let question of settings.questions; let i = index">
-    <label>שאלה {{ i + 1 }}:</label>
-    <select [(ngModel)]="question.type" class="setting-select">
-      <option value="text">שאלה פתוחה (טקסט)</option>
-      <option value="buttons">שאלה עם כפתורים</option>
-      <option value="card">כרטיס מידע</option>
-    </select>
-
-    <input type="text" [(ngModel)]="question.label" class="setting-input"
-           placeholder="תוכן השאלה / כותרת הכרטיס">
-
-    <div *ngIf="question.type === 'buttons'" class="setting-group">
-      <label>כפתורים (כפתור בכל שורה):</label>
-      <textarea [(ngModel)]="question.buttonsText"
-                (ngModelChange)="updateQuestionButtons(i)"
-                class="setting-textarea"
-                placeholder="כפתור 1&#10;כפתור 2"></textarea>
-    </div>
-
-    <div *ngIf="question.type === 'card'" class="setting-group">
-      <label>תיאור הכרטיס:</label>
-      <textarea [(ngModel)]="question.description" class="setting-textarea"
-                placeholder="תיאור הכרטיס"></textarea>
-      <label>תמונה (קישור):</label>
-      <input type="text" [(ngModel)]="question.imageUrl" class="setting-input"
-             placeholder="https://example.com/image.jpg">
-    </div>
-  </div>
-</div>
-
+            <button (click)="addOpeningMessage()" class="add-btn">הוסף</button>
           </div>
+
           
           <div class="design-section">
             <h3>הגדרות עיצוב</h3>
@@ -278,6 +249,18 @@ export class AdminComponent implements OnInit {
       }
     });
   }
+  
+addOpeningMessage() {
+  this.settings.questions.push({ key: '', type: 'text', label: '', buttons: [], buttonsText: '', description: '', imageUrl: '' });
+}
+
+removeOpeningMessage(index: number) {
+  this.settings.questions.splice(index, 1);
+}
+
+drop(event: CdkDragDrop<any[]>) {
+  moveItemInArray(this.settings.questions, event.previousIndex, event.currentIndex);
+}
   updateQuestionButtons(index: number): void {
     const text = this.settings.questions[index].buttonsText || '';
     this.settings.questions[index].buttons = text.split('\n').filter(b => b.trim() !== '');
