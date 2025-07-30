@@ -12,21 +12,22 @@ import { AdminComponent } from '../admin/admin.component';
   standalone: true,
   imports: [CommonModule, FormsModule, AdminComponent],
   template: `
-    <div class="chat-container" [style.background-color]="settings.backgroundColor">
+  
+    <div *ngIf="isLoadingSettings" class="loading-container">
+      <div class="spinner"></div>
+    </div>
+
+    <div *ngIf="!isLoadingSettings" class="chat-container" [style.background-color]="settings.backgroundColor" [style.background-image]="settings.backgroundImageUrl ? 'url(' + settings.backgroundImageUrl + ')' : ''">
       <div class="chat-header" [style.background-color]="settings.primaryColor">
         <div class="chat-icon">{{ settings.chatIcon }}</div>
-        <h3 [style.color]="settings.backgroundColor">{{ settings.chatTitle }}</h3>
-         <!--  
-        <button class="minimize-btn" (click)="minimizeChat()" [style.color]="settings.backgroundColor">
-          ✕
-        </button> -->
-         </div>
+          <h3 [style.color]="settings.backgroundColor">{{ settings.chatTitle }}</h3>
+        </div>
       <div class="chat-messages" #messagesContainer>
        <div *ngFor="let message of messages" class="message-wrapper">
         <div class="message" 
         [class.user-message]="message.isUser"
         [class.bot-message]="!message.isUser"
-        [style.background-color]="message.isUser ? settings.primaryColor : '#f3f4f6'"
+        [style.background-color]="message.isUser ? settings.primaryColor : '#f3f4f6dc'"
         [style.color]="message.isUser ? settings.backgroundColor : settings.textColor">
 
      <!-- הודעת טקסט רגילה -->
@@ -96,7 +97,7 @@ import { AdminComponent } from '../admin/admin.component';
             [disabled]="isLoading || conversationEnded"
             [style.background-color]="isRecording ? '#dc2626' : 'transparent'"
             class="mic-inside">
-              🎤
+              🎙️
             </button>
           </div>
   
@@ -109,10 +110,10 @@ import { AdminComponent } from '../admin/admin.component';
           </button>
         </div>
         <div *ngIf="settings.showCredit" class="chat-credit">
-        <a [href]="settings.creditUrl" target="_blank" rel="noopener noreferrer">
+          <a [href]="settings.creditUrl" target="_blank" rel="noopener noreferrer">
           {{ settings.creditText }}
-        </a>
-      </div>
+          </a>
+        </div>
       </div>
       
       
@@ -143,7 +144,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   threadId: string = '';
   isRecording: boolean = false;
   recognition: any;  // זה יהיה המנוע של זיהוי הדיבור
-  
+  isLoadingSettings: boolean = true;
+
   private settingsSubscription?: Subscription;
   private shouldScrollToBottom = false;
 
@@ -223,6 +225,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   initializeChat(): void {
     // Determine first step based on settings
     this.handleDetailQuestion();
+    this.isLoadingSettings = false;
   }
 
   private updateCSSVariables(): void {

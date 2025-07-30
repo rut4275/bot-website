@@ -17,6 +17,8 @@ export interface ChatMessage {
 }
 
 export interface ChatSettings {
+  chat_width: string;
+  backgroundImageUrl: string;
   webhookUrl: string;
   chatWebhookUrl: string;
   settingsWebhookUrl: string;

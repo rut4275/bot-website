@@ -1,13 +1,33 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+:host {
+  display: block;
+  height: 100%;
+}
+
+app-root, .app-container, .app-main {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .chat-container {
   width: 100%;
-  height: 100vh;
   display: flex;
+  flex:1;
   flex-direction: column;
   font-family: var(--font-family, system-ui, -apple-system, sans-serif);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   overflow: hidden;
   position: relative;
+  background-size: cover;
+  background-position: center;
+  border: 5px solid #424040; /* צבע ורוחב המסגרת */
 }
 
 .chat-header {
@@ -150,7 +170,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: #f9fafb;
+  background-color: rgba(255, 255, 255, 0.6); 
   border-top: 1px solid #e5e7eb;
   z-index: 10;
 }
@@ -160,6 +180,8 @@
   align-items: center;
   padding: 12px 16px;
   padding-bottom: 0px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0); 
 }
 
 .chat-input input {
@@ -188,7 +210,7 @@
   text-align: center;
   font-size: 12px;
   color: #555;
-  /* padding: 4px 0 8px; */
+   /* padding: 4px 0 8px; */
 }
 .chat-credit a {
   color: #007bff;
@@ -389,17 +411,17 @@
 }
 
 /* Desktop styles */
-@media (min-width: 768px) {
+@media (min-width: 600px) {
   .chat-container {
     width: 12cm;
-    height: 600px;
-    max-height: 80vh;
+    height: 100vh;
+    /* max-height: 80vh; */
     margin: 0 auto;
   }
 }
 
 /* Mobile styles */
-@media (max-width: 767px) {
+@media (max-width: 600px) {
   .chat-container {
     width: 100%;
     height: 100vh;
@@ -492,9 +514,10 @@
 }
 
 .chat-input-with-mic {
-  position: relative;
+  flex: 1; /* זה חשוב – מאפשר לאינפוט להתרחב */
   display: flex;
   align-items: center;
+  position: relative;
 }
 
 .message-input {
@@ -514,4 +537,23 @@
   cursor: pointer;
   font-size: 18px;
   color: #333;
+}
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh; /* כל הגובה של המסך */
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid #ccc;
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

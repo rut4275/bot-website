@@ -170,6 +170,15 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
               </div>
             </div>
             
+            
+            <div class="setting-group">
+              <label>URL תמונת רקע</label>
+              <input type="url" [(ngModel)]="settings.backgroundImageUrl" class="setting-input"
+                     placeholder="https://api.example.com/img.png">
+              <small>כתובת URL של התמונה שתוצג כרקע הצאט</small>
+            </div>
+
+
             <div class="setting-group">
               <label>פונט:</label>
               <select [(ngModel)]="settings.fontFamily" class="setting-select">
@@ -249,18 +258,20 @@ export class AdminComponent implements OnInit {
       }
     });
   }
+
   
-addOpeningMessage() {
-  this.settings.questions.push({ key: '', type: 'text', label: '', buttons: [], buttonsText: '', description: '', imageUrl: '' });
-}
+  addOpeningMessage() {
+    this.settings.questions.push({ key: '', type: 'text', label: '', buttons: [], buttonsText: '', description: '', imageUrl: '' });
+  }
 
-removeOpeningMessage(index: number) {
-  this.settings.questions.splice(index, 1);
-}
+  removeOpeningMessage(index: number) {
+    this.settings.questions.splice(index, 1);
+  }
 
-drop(event: CdkDragDrop<any[]>) {
-  moveItemInArray(this.settings.questions, event.previousIndex, event.currentIndex);
-}
+  drop(event: CdkDragDrop<any[]>) {
+    moveItemInArray(this.settings.questions, event.previousIndex, event.currentIndex);
+  }
+
   updateQuestionButtons(index: number): void {
     const text = this.settings.questions[index].buttonsText || '';
     this.settings.questions[index].buttons = text.split('\n').filter(b => b.trim() !== '');

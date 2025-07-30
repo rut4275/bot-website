@@ -351,15 +351,19 @@
 .add-btn {
   margin-top: 8px;
 }
+
 .cdk-drag-preview {
   transform: scale(0.5); /* מעט יותר קטן */
   opacity: 0.9;
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   border-radius: 8px;
+  text-align: right;
+  background-color: #ffffff65;
 }
 .cdk-drag-placeholder {
   opacity: 0.2;
   border: 2px dashed #999;
   border-radius: 8px;
   background: transparent;
+
 }

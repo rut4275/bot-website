@@ -10,6 +10,8 @@ import { ChatSettings } from '../models/chat.models';
 export class SettingsService {
   private readonly STORAGE_KEY = 'chatbot-settings';
   private readonly DEFAULT_SETTINGS: ChatSettings = {
+    chat_width: "600px",
+    backgroundImageUrl: "",
     webhookUrl: "https://api.example.com/webhook",
     chatWebhookUrl: "https://api.example.com/chat",
     settingsWebhookUrl: "https://hook.eu2.make.com/eu471t35hq1r7mbg1q6wbzo45c31e5a9",
@@ -151,4 +153,6 @@ private loadFromLocalStorageOrDefault(): ChatSettings  {
   getCurrentSettings(): ChatSettings {
     return this.settingsSubject.value;
   }
+
+
 }
